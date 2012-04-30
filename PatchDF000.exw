@@ -1,0 +1,59 @@
+-- На данный момент (13.04.12 03:30) не работает
+
+include std/convert.e
+include std/console.e
+include std/filesys.e
+
+include patcher.e
+include patchdf.e
+include disasm.e
+
+sequence path = ""
+sequence cmd = command_line()
+if length(cmd)>2 then
+    path = cmd[3]
+end if
+
+constant df1 = path & "Dwarf Fortress.exe"
+constant df2 = path & "Dwarf Fortress Rus.exe"
+
+printf(1,"Copying \"%s\"\nTo \"%s\"... ",{df1,df2})
+if not copy_file(df1,df2,1) then
+    puts(1,"Failed.")
+    wait_key()
+    abort(1)
+else
+    puts(1,"Success.\n")
+end if
+
+atom fn = open_pe(df2)
+
+-----------------------------------------------------------------------------
+puts(1,"Enabling the cyrillic alphabet...\n")
+
+fpoke(fn, #2F07DC, MOVZX)
+fpoke(fn, #2F063E, MOVZX)
+patch_unicode_table(fn, #7338D8)
+
+-----------------------------------------------------------------------------
+puts(1,"Loading translation file...\n")
+
+sequence trans = load_trans_file("trans.txt")
+
+-----------------------------------------------------------------------------
+
+-- printf(1,"From %x to %x\n",{trans[1][1],trans[$][1]})
+puts(1,"Translating...\n")
+
+for i = 1 to length(trans) do
+    if length(trans[i][2])>=length(trans[i][3]) then
+        fpoke(fn, trans[i][1], trans[i][3]&0&repeat(0,length(trans[i][2])-length(trans[i][3])))
+    -- else
+    -- else
+    end if
+end for
+
+close(fn)
+
+puts(1,"Done.")
+wait_key()

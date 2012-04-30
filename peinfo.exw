@@ -1,0 +1,63 @@
+include std/pretty.e
+include std/search.e
+include std/console.e
+
+include pe.e
+include patcher.e
+
+atom fn = open("d:\\GAMES\\DwarfFortress\\Dwarf Fortress.exe","rb")
+constant pe_header = check_pe(fn)
+
+seek(fn,pe_header)
+printf(1,"Signature: %s\n",{get_bytes(fn,4)})
+puts(1,'\n')
+printf(1,"Machine: %xh\n",get_integer16(fn))
+integer NumberOfSections = get_integer16(fn)
+printf(1,"NumberOfSections: %d\n",NumberOfSections)
+printf(1,"TimeDateStamp: %d\n",get_integer32(fn))
+printf(1,"PointerToSymbolTable: %d\n",get_integer32(fn))
+printf(1,"NumberOfSymbols: %d\n",get_integer32(fn))
+printf(1,"SizeOfOptionalHeader: %d\n",get_integer16(fn))
+printf(1,"Characteristics: %d\n",get_integer16(fn))
+puts(1,'\n')
+printf(1,"Magic: %xh\n",get_integer16(fn))
+printf(1,"LinkerVersion: %d %d\n",get_bytes(fn,2))
+printf(1,"SizeOfCode: %xh\n",get_integer32(fn))
+printf(1,"SizeOfInitializedData: %xh\n",get_integer32(fn))
+printf(1,"SizeOfUninitializedData: %xh\n",get_integer32(fn))
+printf(1,"AddressOfEntryPoint: %xh\n",get_integer32(fn))
+printf(1,"BaseOfCode: %xh\n",get_integer32(fn))
+printf(1,"BaseOfData: %xh\n",get_integer32(fn))
+printf(1,"ImageBase: %xh\n",get_integer32(fn))
+printf(1,"SectionAlignment: %xh\n",get_integer32(fn))
+printf(1,"FileAlignment: %xh\n",get_integer32(fn))
+printf(1,"OperatingSystemVersion: %d %d\n",{get_integer16(fn),get_integer16(fn)})
+printf(1,"ImageVersion: %d %d\n",{get_integer16(fn),get_integer16(fn)})
+printf(1,"SubsystemVersion: %d %d\n",{get_integer16(fn),get_integer16(fn)})
+printf(1,"Win32VersionValue: %d %d\n",get_integer32(fn))
+printf(1,"SizeOfImage: %xh\n",get_integer32(fn))
+printf(1,"SizeOfHeaders: %xh\n",get_integer32(fn))
+printf(1,"CheckSum: %xh\n",get_integer32(fn))
+printf(1,"Subsystem: %d\n",get_integer16(fn))
+printf(1,"DllCharactristics: %xh\n",get_integer16(fn))
+printf(1,"SizeOfStackReserve: %xh\n",get_integer32(fn))
+printf(1,"SizeOfStackCommit: %xh\n",get_integer32(fn))
+printf(1,"SizeOfHeapReserve: %xh\n",get_integer32(fn))
+printf(1,"SizeOfHeapCommit: %xh\n",get_integer32(fn))
+printf(1,"LoaderFlags: %xh\n",get_integer32(fn))
+printf(1,"NumberOfRvaAndSizes: %xh\n",get_integer32(fn))
+
+puts(1,"Data Directory:\n")
+pretty_print(1,get_data_directory(fn),{2,2,1,78,"#%08x","#%08x"})
+puts(1,"\n\n")
+puts(1,"Section Table:\n\n")
+constant sections = get_section_table(fn)
+puts(1,"  Name      VirtualSize  VirtualAddress PhisicalSize PhisicalOffset     Flags\n")
+for i = 1 to length(sections) do
+    printf(1,"%-8s      %08x      %08x      %08x      %08x      %08x\n",
+        sections[i][1..5] & sections[i][$])
+end for
+
+close(fn)
+
+any_key()
