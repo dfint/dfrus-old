@@ -1,3 +1,4 @@
+-- Модуль подпрограмм для патчера
 include std/sequence.e
 include std/get.e
 include std/search.e
