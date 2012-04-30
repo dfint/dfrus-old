@@ -1,0 +1,189 @@
+include std/io.e
+include std/os.e
+include std/pretty.e
+include std/sequence.e
+include std/io.e
+
+include pe.e
+
+function allowed(integer i)
+    return i>=' ' and i<127
+end function
+
+function has_letters(sequence s, object foo)
+    s = s[2]
+    for i = 1 to length(s) do
+        if (s[i]>='A' and s[i]<='Z') or (s[i]>='a' and s[i]<='z') then
+            return 1
+        end if
+    end for
+    return 0
+end function
+
+function normal_case(sequence s, object foo)
+    s = s[2]
+    for i=2 to length(s) do
+        if s[i-1]>='a' and s[i-1]<='z' and s[i]>='A' and s[i]<='Z' then
+            return 0
+        end if
+    end for
+    return 1
+end function
+
+function not_forbidden(sequence s, object foo)
+    s = s[2]
+    for i = 1 to length(s) do
+        if find(s[i],"_@<>\\{}|`~$^;0") then
+            return 0
+        end if
+    end for
+    return 1
+end function
+
+function aligned(sequence s, object foo)
+    return remainder(s[1],4)=0
+end function
+
+function space_after(sequence s, object foo)
+    s = s[2]
+    for i = 1 to length(s)-1 do
+        if find(s[i],",.?!:)]") and s[i+1]!=' ' then
+            return 0
+        end if
+    end for
+    return 1
+end function
+
+function space_before(sequence s, object foo)
+    s = s[2]
+    for i = 2 to length(s) do
+        if find(s[i],"([") and s[i-1]!=' ' then
+            return 0
+        end if
+    end for
+    return 1
+end function
+
+function is_number(integer i)
+    return i>='0' and i<='9'
+end function
+
+function space_before_number(sequence s, object foo)
+    s = s[2]
+    for i = 2 to length(s) do
+        if is_number(s[i]) and not is_number(s[i-1]) and s[i-1]!=' ' then
+            return 0
+        end if
+    end for
+    return 1
+end function
+
+constant beginning = {"data","raw","objects","graphics","Nuked","NULL","Fatal","Unrecognized","Unknown","Missing","Cannot","gl","wgl"}
+function allowed_beginnings(sequence s, object foo)
+    s = s[2]
+    for i=1 to length(beginning) do
+        if match(beginning[i],s)=1 then
+            return 0
+        end if
+    end for
+    return 1
+end function
+
+function three_letter(sequence s,object foo)
+    return length(s[2])<=2
+end function
+
+constant dfexe="d:\\GAMES\\DwarfFortress\\Dwarf Fortress.exe"
+constant KB = 1024, MB = KB*1024
+constant blocksize = MB/4
+constant minlen = 4
+atom initial_offset, max_offset
+sequence sections
+
+puts(1,"Please wait...\n")
+atom fn = open(dfexe,"rb")
+sections = get_section_table(fn)
+initial_offset = sections[2][SECTION_POFFSET]
+max_offset = initial_offset + sections[2][SECTION_PSIZE] - 1
+-- ? sections
+
+seek(fn,initial_offset)
+sequence strings={}, s = ""
+integer first
+integer j = 0, k = 0, bytes_read = 0
+object buf
+while 1 label "mainloop" do
+    position(2,1)
+    buf = get_bytes(fn,blocksize)
+    if length(buf)=0 then
+        exit
+    end if
+    bytes_read += length(buf)
+    printf(1,"%.2f KB read",bytes_read/KB)
+    first = 0
+    for i = 1 to length(buf) do
+        if initial_offset+j*blocksize+i > max_offset then
+            exit "mainloop"
+        end if
+        if not first then
+            if allowed(buf[i]) then
+                first = i
+            end if
+        else
+            if buf[i]=0 then
+                s &= buf[first..i-1]
+                first = 0
+                if length(s)>=minlen then
+                    strings = append(strings,{initial_offset+j*blocksize+i-length(s)-1,s})
+                    -- strings = append(strings,{j*blocksize+i-length(s)-1,s})
+                    k += 1
+                end if
+                s = ""
+            elsif not allowed(buf[i]) then
+                first = 0
+            end if
+        end if
+    end for
+    if first then
+        first = 1
+    end if
+    sleep(0.001)
+    j+=1
+end while
+close(fn)
+printf(1,"\n%d strings extracted.",k)
+
+-- TODO: поиск с помощью relocation table,
+-- объект должен находитьс€ в секции данных, ссылка на него - в секции кода
+
+-- ”брать все, что не выровнено под 4 байта
+-- strings = filter(strings,routine_id("aligned"))
+-- ќтфильтровать строки без букв
+strings = filter(strings,routine_id("has_letters"))
+-- ќтфильтровать строки с неверным регистром (в≈–’Ќ»… регистр после нижнего)
+-- strings = filter(strings,routine_id("normal_case"))
+-- ”брать строки с запрещенными символами
+strings = filter(strings,routine_id("not_forbidden"))
+-- strings = filter(strings,routine_id("space_after"))
+-- strings = filter(strings,routine_id("space_before"))
+-- strings = filter(strings,routine_id("space_before_number"))
+strings = filter(strings,routine_id("allowed_beginnings"))
+printf(1,"\nStrings filetered: %d strings left",length(strings))
+
+fn = open("strings.txt","w")
+for i = 1 to length(strings) do
+    printf(fn,"%x|",strings[i][1])
+    puts(fn,strings[i][2])
+    puts(fn,"||\n")
+end for
+close(fn)
+
+-- strings=filter(strings,routine_id("three_letter"))
+-- fn = open("stringsonly.txt","w")
+-- for i = 1 to length(strings) do
+    -- puts(fn,strings[i][2])
+    -- puts(fn,'\n')
+-- end for
+
+puts(1,"\nPress enter...")
+getc(0)

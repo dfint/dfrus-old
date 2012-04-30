@@ -1,0 +1,32 @@
+include std/console.e
+
+include pe.e
+include patcher.e
+include patchdf.e
+
+constant df = "d:\\GAMES\\DwarfFortress\\Dwarf Fortress.exe"
+
+atom fn = open_pe(df)
+
+constant pe_header = check_pe(fn) -- todo: проверка валидности
+global constant
+    image_base = fpeek4u(fn, pe_header+PE_IMAGE_BASE),
+    sections = get_section_table(fn, pe_header)
+
+-- Получаем адреса всех перемещаемых элементов:
+sequence
+    relocs = get_relocations(fn,sections),
+    xref_table = get_cross_references(fn,relocs,sections),
+    objs  = xref_table[1],
+    xrefs = xref_table[2]
+
+constant code = 1, rdata = 2
+
+-- Нужно удалить все объекты, находящиеся вне секции данных
+-- или ссылка на которые находится вне секции кода
+integer i = 100
+printf(1,"%x (%x)\n",{xrefs[i][1],off_to_rva_ex(xrefs[i][1],sections[code])+image_base})
+
+-- Далее удалить объекты, не являющиеся строками
+
+any_key()
