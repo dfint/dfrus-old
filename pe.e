@@ -1,6 +1,10 @@
+-- Модуль работы с форматом Portable Executable
 include patcher.e
 public include std/io.e
 include std/convert.e
+include std/math.e
+include std/sequence.e
+include std/search.e
 
 public constant
     -- IMAGE_DOS_HEADER
@@ -192,27 +196,105 @@ function off_to_rva_ex(atom off, sequence section)
     return off - section[SECTION_POFFSET] + section[SECTION_RVA]
 end function
 
+public constant
+    IMAGE_REL_BASED_ABSOLUTE    = 0,
+    IMAGE_REL_BASED_HIGH        = 1,
+    IMAGE_REL_BASED_LOW         = 2,
+    IMAGE_REL_BASED_HIGHLOW     = 3
+
+-- function highlow(integer i)
+    -- return and_bits(i, #1000*IMAGE_REL_BASED_HIGHLOW)
+-- end function
+
 public
 function get_relocations(atom fn, object sections = 0)
     sequence dd = get_data_directory(fn)
     if atom(sections) then
         sections = get_section_table(fn)
     end if
-    atom reloc_off = rva_to_off(dd[DD_BASERELOC][1],sections),
+    atom reloc_off = rva_to_off(dd[DD_BASERELOC][1], sections),
          reloc_size = dd[DD_BASERELOC][2]
     sequence relocs = {}
-    atom page, block_size, cur_off = 0, rec
+    integer cur_page, block_size, cur_off = 0, rec
     seek(fn,reloc_off)
     while cur_off < reloc_size do
-        page = get_integer32(fn)
+        cur_page = get_integer32(fn)
         block_size = get_integer32(fn)
-        for i = 1 to (block_size-8)/2 do
+        for i = 1 to floor((block_size-8)/2) do
             rec = get_integer16(fn)
-            if and_bits(rec,#3000) then
-                relocs &= page+and_bits(rec,#0FFF)
+            if and_bits(rec, #1000*IMAGE_REL_BASED_HIGHLOW) then
+                relocs &= cur_page + and_bits(rec, #0FFF)
             end if
         end for
         cur_off += block_size
     end while
     return relocs
+end function
+
+-- mod = {+add, -remove}
+public
+function modify_relocations(atom fn, object sections = 0, sequence mod)
+    sequence dd = get_data_directory(fn)
+    if atom(sections) then
+        sections = get_section_table(fn)
+    end if
+    atom reloc_off = rva_to_off(dd[DD_BASERELOC][1], sections),
+         reloc_size = dd[DD_BASERELOC][2]
+    sequence relocs = {}
+    integer cur_page = 0, cur_page_off, page, block_size, len, cur_off, rec, k
+    
+    for i = 1 to length(mod) do
+        page = floor(abs(mod[i])/#1000)
+        if page!=cur_page then
+            if length(relocs)>0 then
+                -- записать измененный блок релокаций:
+                if length(relocs)>len then
+                    return -1
+                end if
+                fpoke2(fn, reloc_off+cur_page_off+8,
+                    pad_tail(relocs+#1000*IMAGE_REL_BASED_HIGHLOW, len, 0) )
+            end if
+            cur_off = 0
+            while cur_off < reloc_size do
+                seek(fn, reloc_off+cur_off) -- перейти к началу следующего/текущего блока
+                cur_page = get_integer32(fn)
+                block_size = get_integer32(fn)
+                len = floor( (block_size-8)/2 )
+                if cur_page = page then
+                    exit
+                end if
+                cur_off += block_size
+            end while
+            cur_page_off = cur_off
+            -- считать блок релокаций:
+            relocs = {}
+            for j = 1 to len do
+                rec = get_integer16(fn)
+                if and_bits(rec, #1000*IMAGE_REL_BASED_HIGHLOW) then
+                    relocs &= and_bits(rec, #0FFF)
+                end if
+            end for
+        end if
+        rec = and_bits(abs(mod[i]), #0FFF)
+        k = binary_search(rec, relocs)
+        if mod[i]>0 then
+            if k>0 then
+                return -2
+            end if
+            relocs = insert(relocs, rec, -k)
+        else
+            if k<0 then
+                return -3
+            end if
+            relocs = remove(relocs, rec, k)
+        end if
+    end for
+    
+    -- записать измененный блок релокаций:
+    if length(relocs)>len then
+        return -1
+    end if
+    fpoke2(fn, reloc_off+cur_page_off+8,
+        pad_tail(relocs+#1000*IMAGE_REL_BASED_HIGHLOW, len, 0) )
+    return 0 -- OK
 end function
