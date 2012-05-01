@@ -366,7 +366,7 @@ function get_length(sequence s, integer len)
     return {i-1, dest, deleted} -- {длина кода, место назначения, смещения ссылок в память}
 end function
 
-public constant new_ref_off = 5 -- смещение ссылки на источник (IMM32) в генерируемом машинном коде
+public integer new_ref_off -- смещение ссылки на источник в генерируемом машинном коде
 -- Функция возвращает машинный код, копирующий требуемое количество байт в нужное место
 public
 function mach_memcpy(integer src, sequence dest, integer count) -- (адрес, {регистр, смещение}, количество байт)
@@ -374,8 +374,10 @@ function mach_memcpy(integer src, sequence dest, integer count) -- (адрес, {реги
     integer md
     mach &= (XOR_RM_REG+1) & (#C0+#08*ECX+ECX) & -- XOR ECX, ECX
         (MOV_REG_IMM+CL) & (floor(count+3)/4) & -- MOV CL, IMM8
-        (MOV_REG_IMM+8+ESI) & int_to_bytes(src) -- MOV ESI, IMM32
-    
+        (MOV_REG_IMM+8+ESI) -- MOV ESI, ...
+    new_ref_off = length(mach)
+    mach &= int_to_bytes(src) -- IMM32
+    mach &= PUSH_REG + EDI
     -- LEA EDI, [reg+imm] :
     mach &= LEA
     if dest[2] = 0 and dest[1] != EBP then
@@ -400,6 +402,8 @@ function mach_memcpy(integer src, sequence dest, integer count) -- (адрес, {реги
     end if
     
     mach &= REP & MOVSD -- nuff said
+    
+    mach &= POP_REG + EDI
     
     return mach
 end function
