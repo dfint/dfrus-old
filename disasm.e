@@ -61,9 +61,12 @@ public constant
 
 -- push
 public constant
-    PUSH_REG   = #50, -- + REG
-    PUSH_IMM8  = #6A,
-    PUSH_IMM32 = #68
+    PUSH_REG    = #50, -- + REG
+    PUSH_IMM8   = #6A,
+    PUSH_IMM32  = #68
+
+public constant
+    POP_REG     = #58 -- + REG
 
 public constant
     MOV_REG_IMM   = #B0, -- + 8*width + REG
