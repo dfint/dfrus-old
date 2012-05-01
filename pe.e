@@ -176,6 +176,11 @@ function rva_to_off(atom rva, sequence section_table)
     return -1
 end function
 
+public
+function rva_to_off_ex(atom off, sequence section)
+    return off + section[SECTION_POFFSET] - section[SECTION_RVA]
+end function
+
 -- converts offset to relative virtual address
 public
 function off_to_rva(atom off, sequence section_table)
@@ -241,11 +246,11 @@ function modify_relocations(atom fn, object sections = 0, sequence mod)
     atom reloc_off = rva_to_off(dd[DD_BASERELOC][1], sections),
          reloc_size = dd[DD_BASERELOC][2]
     sequence relocs = {}
-    integer cur_page = 0, cur_page_off, page, block_size, len, cur_off, rec, k
+    integer cur_page = 0, next_page = 0, cur_page_off, block_size, len, cur_off, rec, k, rva
     
     for i = 1 to length(mod) do
-        page = floor(abs(mod[i])/#1000)
-        if page!=cur_page then
+        rva = abs(mod[i])
+        if rva < cur_page or rva >= next_page then
             if length(relocs)>0 then
                 -- записать измененный блок релокаций:
                 if length(relocs)>len then
@@ -255,18 +260,24 @@ function modify_relocations(atom fn, object sections = 0, sequence mod)
                     pad_tail(relocs+#1000*IMAGE_REL_BASED_HIGHLOW, len, 0) )
             end if
             cur_off = 0
+            cur_page_off = -1
             while cur_off < reloc_size do
                 seek(fn, reloc_off+cur_off) -- перейти к началу следующего/текущего блока
-                cur_page = get_integer32(fn)
-                block_size = get_integer32(fn)
-                len = floor( (block_size-8)/2 )
-                if cur_page = page then
+                next_page = get_integer32(fn)
+                if next_page > rva then
+                    cur_page_off = cur_off - block_size
                     exit
                 end if
+                cur_page = next_page
+                block_size = get_integer32(fn)
+                len = floor( (block_size-8)/2 )
                 cur_off += block_size
             end while
-            cur_page_off = cur_off
+            if cur_page_off < 0 then
+                return -4
+            end if
             -- считать блок релокаций:
+            seek(fn, reloc_off+cur_page_off+8)
             relocs = {}
             for j = 1 to len do
                 rec = get_integer16(fn)
@@ -275,7 +286,7 @@ function modify_relocations(atom fn, object sections = 0, sequence mod)
                 end if
             end for
         end if
-        rec = and_bits(abs(mod[i]), #0FFF)
+        rec = rva - cur_page
         k = binary_search(rec, relocs)
         if mod[i]>0 then
             if k>0 then
@@ -286,10 +297,9 @@ function modify_relocations(atom fn, object sections = 0, sequence mod)
             if k<0 then
                 return -3
             end if
-            relocs = remove(relocs, rec, k)
+            relocs = remove(relocs, k)
         end if
     end for
-    
     -- записать измененный блок релокаций:
     if length(relocs)>len then
         return -1
