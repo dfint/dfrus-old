@@ -185,8 +185,7 @@ for i = 1 to length(trans) do
             -- Если строка длинная, то записать ее в специально отведенную для этого секцию:
             str_off += aligned
             aligned = align(length(trans[i][3])+1)
-            extra = aligned-length(trans[i][3])
-            fpoke(fn, str_off, trans[i][3] & repeat(0, extra)) -- pad with zeros
+            fpoke(fn, str_off, pad_tail(trans[i][3], aligned, 0))
         end if
         
         for j = 1 to length(s) do
@@ -220,7 +219,7 @@ for i = 1 to length(trans) do
                         end if
                         continue -- полученный машинный код не уместился
                     end if
-                    mach &= repeat(NOP, x[1]-length(mach)) -- добиваем освободившиеся байты пустыми командами
+                    mach = pad_tail(mach, x[1], NOP) -- добиваем освободившиеся байты пустыми командами
                     fpoke(fn, start, mach) -- патчим код!
                     -- todo: удаляем битые релокации, добавляем новые
                 end if
