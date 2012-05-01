@@ -6,12 +6,12 @@ include std/search.e
 include std/get.e
 include std/sequence.e
 
+-- with trace
 include patcher.e
 include pe.e
 include disasm.e
 
 global integer debug = 0
-with trace
 include patchdf.e
 
 sequence path = ""
@@ -161,9 +161,6 @@ for i = 1 to length(trans) do
         for j = 1 to length(s) do
             delta =  s[j] - xrefs[k+l][1]
             if length(xrefs[k+l]) = 1 and delta>0 and delta<=6 then
-                -- if debug then
-                    -- printf(1,"%x %x\n", x[j] & xrefs[k+l])
-                -- end if
                 s[j] = xrefs[k+l][1]
             end if
         end for
@@ -204,25 +201,28 @@ for i = 1 to length(trans) do
                 -- Получаем длину кода, копирующего строку:
                 x = get_length( fpeek(fn, {start, 100}), length(trans[i][2])+1)
                 
-                if debug then
-                    printf(1,"%x|%s|%s| <- %x (%x)\n",
-                        trans[i][1..3] & s[j] & ( off_to_rva_ex(s[j], sections[1])+image_base ) )
-                    print(1, x)
-                    puts(1,'\n')
-                end if
-                
                 if sequence(x) then
                     -- Получаем машинный код, копирующий строку:
                     mach = mach_memcpy(off_to_rva_ex(str_off, new_section)+image_base, x[2], length(trans[i][3])+1)
                     if length(mach) > x[1] then
                         if debug then
-                            puts(1,"Mach code is too long\n")
+                            printf(1,"%x|%s|%s| <- %x (%x)\n",
+                                trans[i][1..3] & s[j] & ( off_to_rva_ex(s[j], sections[1])+image_base ) )
+                            printf(1, "Mach code is too long (%d against %d).\n",{length(mach),x[1]})
                         end if
                         continue -- полученный машинный код не уместился
                     end if
                     mach = pad_tail(mach, x[1], NOP) -- добиваем освободившиеся байты пустыми командами
                     fpoke(fn, start, mach) -- патчим код!
-                    -- todo: удаляем битые релокации, добавляем новые
+                    -- Исправляем битые релокации --
+                    -- Преобразуем смещение начала измененного кода в его относительный адрес:
+                    start = off_to_rva_ex(start, sections[1])
+                    x[3] += start-1 -- получаем адреса удаленных ссылок
+                    if modify_relocations(fn, sections, (-x[3]) & (start+new_ref_off)) != 0 and debug then
+                        puts(1, "Failed to fix relocations.\n")
+                    end if
+                elsif debug then
+                    printf(1,"Failed to obtain copying code length (Error code %d).\n",x)
                 end if
             end if
         end for
