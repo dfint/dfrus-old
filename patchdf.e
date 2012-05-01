@@ -59,10 +59,11 @@ function get_cross_references(atom fn, sequence relocs, sequence sections)
         -- Получаем смещение объекта, на который указывает перемещаемый элемент
         -- превращаем адрес в смещение и читаем что по этому смещению находится:
         relocs[i] = rva_to_off(relocs[i], sections)
-        obj = fpeek4u(fn,relocs[i]) - image_base - sections[rdata][SECTION_RVA]
+        -- Получаем смещение объекта от начала секции rdata:
+        obj = fpeek4u(fn, relocs[i]) - image_base - sections[rdata][SECTION_RVA]
         -- Проверяем, находится ли адрес в секции .rdata:
         if obj >= 0 and obj < sections[rdata][SECTION_VSIZE] then
-            -- преобразуем считанный адрес объекта в его смещение:
+            -- Преобразуем считанный адрес объекта в его смещение от начала файла:
             obj += sections[rdata][SECTION_POFFSET]
             
             -- Добавляем смещение объекта в сортированную таблицу смещений
@@ -365,6 +366,7 @@ function get_length(sequence s, integer len)
     return {i-1, dest, deleted} -- {длина кода, место назначения, смещения ссылок в память}
 end function
 
+public constant new_ref_off = 5 -- смещение ссылки на источник (IMM32) в генерируемом машинном коде
 -- Функция возвращает машинный код, копирующий требуемое количество байт в нужное место
 public
 function mach_memcpy(integer src, sequence dest, integer count) -- (адрес, {регистр, смещение}, количество байт)
