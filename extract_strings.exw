@@ -1,3 +1,4 @@
+-- Утилита, с помощью которой вытаскивались текстовые строки из Dwarf Fortress.exe
 include std/io.e
 include std/os.e
 include std/pretty.e
