@@ -1,3 +1,5 @@
+-- Тестовая программа для проверки правильности работы функций модуля pe.e
+
 include std/pretty.e
 include std/search.e
 include std/console.e
