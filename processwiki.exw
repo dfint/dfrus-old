@@ -1,3 +1,5 @@
+-- Утилита для обработки файлов, скачанных с wiki, для получения файла trans.txt
+
 include std/get.e
 include std/search.e
 
