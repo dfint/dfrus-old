@@ -52,7 +52,7 @@ function load_trans_file(sequence fname)
     return trans
 end function
 
-constant rdata = 2
+constant code=1, rdata = 2
 public
 function get_cross_references(atom fn, sequence relocs, sequence sections)
     atom ref, obj
@@ -62,7 +62,14 @@ function get_cross_references(atom fn, sequence relocs, sequence sections)
     for i = 1 to length(relocs) do
         -- Получаем смещение объекта, на который указывает перемещаемый элемент
         -- превращаем адрес в смещение и читаем что по этому смещению находится:
-        relocs[i] = rva_to_off(relocs[i], sections)
+        -- relocs[i] = rva_to_off(relocs[i], sections)
+        relocs[i] -= sections[code][SECTION_RVA]
+        -- Ссылка должна находиться в секции кода:
+        if relocs[i] < 0 or relocs[i]>=sections[code][SECTION_VSIZE] then
+            continue
+        end if
+        relocs[i] += sections[code][SECTION_POFFSET]
+        
         -- Получаем смещение объекта от начала секции rdata:
         obj = fpeek4u(fn, relocs[i]) - image_base - sections[rdata][SECTION_RVA]
         -- Проверяем, находится ли адрес в секции .rdata:
