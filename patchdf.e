@@ -54,7 +54,7 @@ end function
 
 constant code=1, rdata = 2
 public
-function get_cross_references(atom fn, sequence relocs, sequence sections)
+function get_cross_references(atom fn, sequence relocs, sequence sections, atom image_base)
     atom ref, obj
     sequence objs = {}, xrefs = {}
     integer k

@@ -50,13 +50,13 @@ sequence trans = load_trans_file("trans.txt")
 puts(1,"Finding cross-referencess...\n")
 
 constant pe_header = check_pe(fn) -- todo: проверка валидности
-global constant image_base = fpeek4u(fn,pe_header+PE_IMAGE_BASE)
+constant image_base = fpeek4u(fn,pe_header+PE_IMAGE_BASE)
 constant sections = get_section_table(fn)
 
 -- ѕолучаем адреса всех перемещаемых элементов:
 sequence relocs = get_relocations(fn,sections)
 
-sequence xref_table = get_cross_references(fn,relocs,sections)
+sequence xref_table = get_cross_references(fn,relocs,sections,image_base)
 
 sequence objs = xref_table[1], xrefs = xref_table[2]
 
