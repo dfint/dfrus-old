@@ -269,5 +269,5 @@ end if
 
 close(fn)
 
-puts(1,"Done.")
+puts(1,"Done.\n")
 any_key()
