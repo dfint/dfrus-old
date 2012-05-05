@@ -40,7 +40,7 @@ function load_trans_file(sequence fname)
                 x[1] = off[2]
                 x[2] = match_replace("\\r", x[2], "\r")
                 x[3] = match_replace("\\r", x[3], "\r")
-                if x[1]>trans[$][1] then
+                if length(trans)>0 and x[1]>trans[$][1] then
                     trans = append(trans,x)
                 else
                     -- todo: вставлять в нужное место
