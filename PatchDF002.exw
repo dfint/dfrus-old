@@ -37,7 +37,7 @@ constant DF03125SDL_stamp = #4D90764F
 fn = open_pe(df1)
 if fn < 0 then
     printf(1,"\nUnable to open \"%s\"\n",{df1})
-    wait_key()
+    any_key()
     abort(1)
 end if
 
@@ -46,7 +46,7 @@ constant timedate = fpeek4u(fn, pe_header+PE_TIMEDATE_STAMP)
 close(fn)
 if timedate != DF03125SDL_stamp then
     puts(1,"\nWrong timedate stamp. The patcher works with DF 0.31.25 SDL only.\n")
-    wait_key()
+    any_key()
     abort(1)
 else
     puts(1,"OK\n")
@@ -56,7 +56,7 @@ end if
 printf(1,"Copying \"%s\"\nTo \"%s\"... ",{df1,df2})
 if not copy_file(df1,df2,1) then
     puts(1,"Failed.")
-    wait_key()
+    any_key()
     abort(1)
 else
     puts(1,"Success.\n")
@@ -79,7 +79,7 @@ object trans = load_trans_file(trans_filename)
 if atom(trans) then
     close(fn)
     printf(1,"Failed.\n%s file not found.\n",{trans_filename})
-    wait_key()
+    any_key()
     abort(-1)
 else
     printf(1,"%d strings loaded.\n", length(trans))
@@ -269,4 +269,4 @@ end if
 close(fn)
 
 puts(1,"Done.")
-wait_key()
+any_key()
