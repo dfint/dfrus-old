@@ -6,9 +6,10 @@ include std/console.e
 include std/filesys.e
 
 include patcher.e
-include patchdf.e
 include disasm.e
 
+global integer debug = 0
+include patchdf.e
 sequence path = ""
 sequence cmd = command_line()
 if length(cmd)>2 then
