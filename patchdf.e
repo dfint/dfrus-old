@@ -418,3 +418,49 @@ function mach_memcpy(integer src, sequence dest, integer count) -- (адрес, {реги
     
     return mach
 end function
+
+constant blocksize = 1024
+
+function forbidden(integer i)
+    return find(i,"$;<>@^_`{|}")
+end function
+
+function allowed(integer i)
+    return i='\r' or (i>=' ' and i<127 and not forbidden(i))
+end function
+
+function extract_strings(atom fn, sequence xref_table)
+    sequence
+        objs  = xref_table[1],
+        xrefs = xref_table[2],
+        strings = {}
+    object buf
+    integer len
+    
+    for i = 1 to length(objs) do
+        -- исключить ссылки на середины строк:
+        if length(strings)>0 and objs[i]<=strings[$][1]+len then
+            continue
+        end if
+        -- считываем блок данных:
+        seek(fn, objs[i])
+        buf = get_bytes(fn, blocksize)
+        if atom(buf) then
+            return -1
+        end if
+        -- проверяем, является ли данный объект строкой:
+        len = -1
+        for j = 1 to length(buf) do
+            if buf[j] = 0 then
+                len = j-1
+                exit
+            elsif not allowed(buf[j]) then
+                exit
+            end if
+        end for
+        if len>0 then
+            strings = append(strings,{objs[i],buf[1..len]})
+        end if
+    end for
+    return strings
+end function
