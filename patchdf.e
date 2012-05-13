@@ -159,7 +159,7 @@ function fix_len(atom fn, atom off, integer oldlen, integer len)
             r = remainder(oldlen+1,4)
             fpoke4(fn, off-5, floor((len+1-r+3)/4)) -- с учетом инструкций, копирующих остаток строки
             return 1
-        elsif pre[$-3]=LEA and and_bits(pre[$-2],#F8)=#78 and pre[$-1]=oldlen then -- lea edi, [reg+len]
+        elsif pre[$-3]=LEA and and_bits(pre[$-2],#F8)=#40+EDI*#8 and pre[$-1]=oldlen then -- lea edi, [reg+len]
             fpoke(fn, off-2, len) -- возможно, исправляет обрезание текста
             return 1
         else
