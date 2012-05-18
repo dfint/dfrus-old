@@ -77,7 +77,7 @@ function load_trans_file_to_map(sequence fname)
     return trans
 end function
 
-constant code=1, rdata = 2
+constant code=1, rdata = 2, data = 3
 public
 function get_cross_references(atom fn, sequence relocs, sequence sections, atom image_base)
     atom ref, obj
@@ -95,13 +95,10 @@ function get_cross_references(atom fn, sequence relocs, sequence sections, atom 
         end if
         relocs[i] += sections[code][SECTION_POFFSET]
         
-        -- Получаем смещение объекта от начала секции rdata:
-        obj = fpeek4u(fn, relocs[i]) - image_base - sections[rdata][SECTION_RVA]
-        -- Проверяем, находится ли адрес в секции .rdata:
-        if obj >= 0 and obj < sections[rdata][SECTION_VSIZE] then
-            -- Преобразуем считанный адрес объекта в его смещение от начала файла:
-            obj += sections[rdata][SECTION_POFFSET]
-            
+        -- Читываем адрес объекта и преобразуем его в смещение от начала файла:
+        obj = rva_to_off(fpeek4u(fn, relocs[i]) - image_base, sections)
+        -- Проверяем, находится ли адрес в секциях .rdata или .data:
+        if obj >= sections[rdata][SECTION_POFFSET] and obj < sections[data][SECTION_POFFSET]+sections[data][SECTION_PSIZE] then
             -- Добавляем смещение объекта в сортированную таблицу смещений
             k = binary_search(obj, objs)
             if k < 0 then -- Если смещение объекта не найдено, то
