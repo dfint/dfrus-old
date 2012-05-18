@@ -409,8 +409,10 @@ function mach_memcpy(integer src, sequence dest, integer count) -- (адрес, {реги
     mach &= (XOR_RM_REG+1) & (#C0+#08*ECX+ECX) & -- XOR ECX, ECX
         (MOV_REG_IMM+CL) & (floor(count+3)/4) -- MOV CL, IMM8
     
+    -- —охранение регистров esi и edi в стеке
     mach &= PUSH_REG + ESI
     mach &= PUSH_REG + EDI
+    
     -- LEA EDI, [reg+imm] :
     mach &= LEA
     if dest[2] = 0 and dest[1] != EBP then
@@ -438,8 +440,9 @@ function mach_memcpy(integer src, sequence dest, integer count) -- (адрес, {реги
     new_ref_off = length(mach)
     mach &= int_to_bytes(src) -- IMM32
     
-    mach &= REP & MOVSD -- nuff said
+    mach &= REP & MOVSD -- REP MOVSD
     
+    -- ¬осстановление регистров esi и edi из стека
     mach &= POP_REG + EDI
     mach &= POP_REG + ESI
     
