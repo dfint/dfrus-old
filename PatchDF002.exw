@@ -89,7 +89,7 @@ function second(sequence s)
     return s[2]
 end function
 
-if debug and length(cmd)>4 then
+if debug and length(cmd)>=5 then
     trans = trans[second(value(cmd[4]))..second(value(cmd[5]))]
     printf(1,"From %x to %x total %d\n",{trans[1][1],trans[$][1],length(trans)})
 end if
