@@ -7,7 +7,7 @@ include std/get.e
 include std/sequence.e
 include std/map.e
 
--- with trace
+with trace
 include patcher.e
 include pe.e
 include disasm.e
@@ -168,10 +168,15 @@ end if
 
 for i = 1 to length(strings) do
     translation = map:get(trans, strings[i][2])
-    if atom(translation) or equal(strings[i][2], translation) then
-        continue -- перевод не найден или равен оригиналу
+    if atom(translation) then
+        if debug then
+            printf(1,"Translation not found for \"%s\".\n", {strings[i][2]})
+        end if
+        continue -- перевод не найден
     end if
-    
+    if equal(strings[i][2], translation) then
+        continue -- перевод равен оригиналу
+    end if
     -- ѕоиск строки в таблице объектов:
     k = binary_search(strings[i][1], objs)
     if k <= 0 then
@@ -215,6 +220,7 @@ for i = 1 to length(strings) do
         
         for j = 1 to length(s) do
             -- »справить длину строки:
+            -- trace(1)
             if fix_len(fn, s[j], length(strings[i][2]), length(translation)) then
                 if long then -- ≈сли строка длинна€,
                     -- то исправить ссылку на строку в коде:
