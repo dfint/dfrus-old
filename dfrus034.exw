@@ -80,11 +80,6 @@ function second(sequence s)
     return s[2]
 end function
 
-if debug and length(cmd)>4 then
-    trans = trans[second(value(cmd[4]))..second(value(cmd[5]))]
-    printf(1,"From %x to %x total %d\n",{trans[1][1],trans[$][1],length(trans)})
-end if
-
 -----------------------------------------------------------------------------
 puts(1,"Finding cross-referencess...\n")
 
@@ -163,7 +158,13 @@ sequence s, pre, mach
 integer aligned = 0, k, l, extra, delta, start, long
 object x, translation
 sequence strings = extract_strings(fn, xref_table)
-
+if debug then
+    printf(1,"%d strings extracted.\n", length(strings))
+    if length(cmd)>=5 then
+        strings = strings[second(value(cmd[4]))..second(value(cmd[5]))]
+        printf(1,"From %x to %x total %d\n",{strings[1][1], strings[$][1], length(trans)})
+    end if
+end if
 
 for i = 1 to length(strings) do
     translation = map:get(trans, strings[i][2])
