@@ -55,7 +55,7 @@ end if
 -----------------------------------------------------------------------------
 printf(1,"Copying \"%s\"\nTo \"%s\"... ",{df1,df2})
 if not copy_file(df1,df2,1) then
-    puts(1,"Failed.")
+    puts(1,"Failed.\n")
     any_key()
     abort(1)
 else
