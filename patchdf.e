@@ -459,6 +459,10 @@ function allowed(integer i)
     return i='\r' or (i>=' ' and i<127 and not forbidden(i))
 end function
 
+function letter(integer i)
+    return (i>='A' and i<='Z') or (i>='a' and i<='z')
+end function
+
 public
 function extract_strings(atom fn, sequence xref_table)
     sequence
@@ -481,15 +485,18 @@ function extract_strings(atom fn, sequence xref_table)
         end if
         -- проверяем, является ли данный объект строкой:
         len = -1
+        integer letters = 0
         for j = 1 to length(buf) do
             if buf[j] = 0 then
                 len = j-1
                 exit
             elsif not allowed(buf[j]) then
                 exit
+            elsif letter(buf[j]) then
+                letters += 1
             end if
         end for
-        if len>0 then
+        if len>0 and letters>0 then
             strings = append(strings,{objs[i],buf[1..len]})
         end if
     end for
