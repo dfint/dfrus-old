@@ -3,6 +3,7 @@ include std/sequence.e
 include std/get.e
 include std/search.e
 include std/convert.e
+include std/map.e
 
 include patcher.e
 include pe.e
@@ -34,7 +35,7 @@ function load_trans_file(sequence fname)
             exit
         end if
         x = split(line, '|')
-        if length(x)>=3 then
+        if length(x)>3 then
             off = value('#' & x[1])
             if off[1] = GET_SUCCESS then
                 x[1] = off[2]
@@ -49,6 +50,30 @@ function load_trans_file(sequence fname)
         end if
     end while
     close(fn)
+    return trans
+end function
+
+public
+function load_trans_file_to_map(sequence fname)
+    object line
+    sequence x
+    map trans = new()
+    atom fn = open(fname, "r")
+    if fn < 0 then
+        return -1
+    end if
+    while 1 do
+        line = gets(fn)
+        if atom(line) then
+            exit
+        end if
+        x = split(line, '|')
+        if length(x)>3 then
+            x[2] = match_replace("\\r", x[2], "\r")
+            x[3] = match_replace("\\r", x[3], "\r")
+            put(trans,x[2],x[3])
+        end if
+    end while
     return trans
 end function
 
