@@ -199,7 +199,7 @@ function fix_len(atom fn, atom off, integer oldlen, integer len)
                 end if
                 
                 move_to_mem = find_from(MOV_RM_REG, aft, move_to_reg+1)
-                if and_bits(aft[move_to_mem+1], #C0) != #40 then -- проверка байта MOD R/M
+                if and_bits(aft[move_to_mem+1], #C0) = #C0 then -- проверка байта MOD R/M
                     move_to_mem = -move_to_mem
                 end if
                 
