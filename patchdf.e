@@ -407,10 +407,9 @@ function mach_memcpy(integer src, sequence dest, integer count) -- (адрес, {реги
     sequence mach = {}
     integer md
     mach &= (XOR_RM_REG+1) & (#C0+#08*ECX+ECX) & -- XOR ECX, ECX
-        (MOV_REG_IMM+CL) & (floor(count+3)/4) & -- MOV CL, IMM8
-        (MOV_REG_IMM+8+ESI) -- MOV ESI, ...
-    new_ref_off = length(mach)
-    mach &= int_to_bytes(src) -- IMM32
+        (MOV_REG_IMM+CL) & (floor(count+3)/4) -- MOV CL, IMM8
+    
+    mach &= PUSH_REG + ESI
     mach &= PUSH_REG + EDI
     -- LEA EDI, [reg+imm] :
     mach &= LEA
@@ -435,9 +434,14 @@ function mach_memcpy(integer src, sequence dest, integer count) -- (адрес, {реги
         mach &= int_to_bytes(dest[2])
     end if
     
+    mach &= (MOV_REG_IMM+8+ESI) -- MOV ESI, ...
+    new_ref_off = length(mach)
+    mach &= int_to_bytes(src) -- IMM32
+    
     mach &= REP & MOVSD -- nuff said
     
     mach &= POP_REG + EDI
+    mach &= POP_REG + ESI
     
     return mach
 end function
