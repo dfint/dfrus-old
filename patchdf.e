@@ -452,6 +452,7 @@ function allowed(integer i)
     return i='\r' or (i>=' ' and i<127 and not forbidden(i))
 end function
 
+public
 function extract_strings(atom fn, sequence xref_table)
     sequence
         objs  = xref_table[1],
