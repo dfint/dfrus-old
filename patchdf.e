@@ -369,7 +369,7 @@ function get_length(sequence s, integer len)
             end if
         elsif op = LEA then
             -- Разбиваем байт MOD R/M на отдельные поля:
-            modrm = triads(s[i+1])
+            modrm = triads(s[i])
             if modrm[1] = 3 then
                 return -7 -- регистровая адресация в LEA недопустима
             end if
