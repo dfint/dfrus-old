@@ -413,27 +413,30 @@ function mach_memcpy(integer src, sequence dest, integer count) -- (адрес, {реги
     mach &= PUSH_REG + ESI
     mach &= PUSH_REG + EDI
     
-    -- LEA EDI, [reg+imm] :
-    mach &= LEA
-    if dest[2] = 0 and dest[1] != EBP then
-        md = 0 -- без смещения
-    elsif dest[2] >= -128 and dest[2] < 128 then
-        md = 1 -- однобайтовое смещение
-    else
-        md = 2 -- четырехбайтовое смещение
-    end if
-    
-    if dest[1] = ESP then
-        mach &= #40*md + #08*EDI + 4 -- байт mod r/m
-        mach &= 0 + #08*4 + dest[1] -- байт sib
-    else
-        mach &= #40*md + #08*EDI + dest[1] -- байт mod r/m
-    end if
-    
-    if md = 1 then
-        mach &= dest[2]
-    elsif md = 2 then
-        mach &= int_to_bytes(dest[2])
+    -- Если адрес места назначения еще не находится в регистре edi, кладем его туда:
+    if not equal(dest,{EDI,0}) then
+        -- LEA EDI, [reg+imm] :
+        mach &= LEA
+        if dest[2] = 0 and dest[1] != EBP then
+            md = 0 -- без смещения
+        elsif dest[2] >= -128 and dest[2] < 128 then
+            md = 1 -- однобайтовое смещение
+        else
+            md = 2 -- четырехбайтовое смещение
+        end if
+        
+        if dest[1] = ESP then
+            mach &= #40*md + #08*EDI + 4 -- байт mod r/m
+            mach &= 0 + #08*4 + dest[1] -- байт sib
+        else
+            mach &= #40*md + #08*EDI + dest[1] -- байт mod r/m
+        end if
+        
+        if md = 1 then
+            mach &= dest[2]
+        elsif md = 2 then
+            mach &= int_to_bytes(dest[2])
+        end if
     end if
     
     mach &= (MOV_REG_IMM+8+ESI) -- MOV ESI, ...
