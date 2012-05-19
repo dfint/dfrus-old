@@ -144,7 +144,7 @@ include disasm.e
 
 -- ‘ункци€ исправлени€ длины, прописанной в коде
 -- ¬озвращает: 0 если не удалось исправить, 1 если удалось, -1 если исправл€ть не нужно
-constant count = #18, count_after = #50
+constant count = #18, count_after = #40
 public
 function fix_len(atom fn, atom off, integer oldlen, integer len)
     atom operand, next = off+4
@@ -411,10 +411,8 @@ public
 function mach_memcpy(integer src, sequence dest, integer count) -- (адрес, {регистр, смещение}, количество байт)
     sequence mach = {}
     integer md
-    -- —охранение регистров esi, edi и ecx в стеке
-    mach &= PUSH_REG + ESI
-    mach &= PUSH_REG + EDI
-    mach &= PUSH_REG + ECX
+    -- —охранение регистров общего назначени€ в стеке
+    mach &= PUSHAD
     
     mach &= (XOR_RM_REG+1) & (#C0+#08*ECX+ECX) & -- XOR ECX, ECX
         (MOV_REG_IMM+CL) & (floor(count+3)/4) -- MOV CL, IMM8
@@ -451,10 +449,8 @@ function mach_memcpy(integer src, sequence dest, integer count) -- (адрес, {реги
     
     mach &= REP & MOVSD -- REP MOVSD
     
-    -- ¬осстановление регистров esi, edi, ecx из стека
-    mach &= POP_REG + ECX
-    mach &= POP_REG + EDI
-    mach &= POP_REG + ESI
+    -- ¬осстановление регистров общего назначени€ из стека
+    mach &= POPAD
     
     return mach
 end function
