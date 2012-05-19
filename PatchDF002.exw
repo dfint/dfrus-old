@@ -205,6 +205,9 @@ for i = 1 to length(trans) do
                 if sequence(x) then
                     -- ѕолучаем машинный код, копирующий строку:
                     mach = mach_memcpy(off_to_rva_ex(str_off, new_section)+image_base, x[2], length(trans[i][3])+1)
+                    if sequence(x[4]) then
+                        mach &= lea(x[4][1],x[4][2..3])
+                    end if
                     if length(mach) > x[1] then
                         if debug then
                             printf(1,"%x|%s|%s| <- %x (%x)\n",
