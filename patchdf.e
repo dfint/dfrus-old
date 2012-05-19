@@ -202,13 +202,16 @@ function fix_len(atom fn, atom off, integer oldlen, integer len)
                 end if
                 
                 move_to_mem = find_from(MOV_RM_REG, aft, move_to_reg+1)
+                if move_to_mem = 0 then
+                    return 0
+                end if
                 modrm = triads(aft[move_to_mem+1])
                 -- if and_bits(aft[move_to_mem+1], #C0) = #C0 then -- проверка байта MOD R/M
                 if modrm[1]=3 then -- проверка байта MOD R/M
                     move_to_mem = -move_to_mem
                 end if
                 
-                if move_to_reg > 0 and move_to_mem > move_to_reg then
+                if move_to_reg > 0 then
                     opcode = aft[move_to_reg]
                     fpoke(fn, next+move_to_reg-1, opcode+1) -- Увеличение размера операнда с byte до dword (установкой бита размера операнда)
                     opcode = aft[move_to_mem]
