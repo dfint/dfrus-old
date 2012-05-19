@@ -152,6 +152,7 @@ function fix_len(atom fn, atom off, integer oldlen, integer len)
              aft = fpeek(fn, {next,count})
     integer r
     integer move_to_reg, move_to_mem, opcode
+    sequence modrm
     
     if aft[1] = JMP_SHORT or
         aft[1] = JMP_NEAR or
@@ -194,12 +195,16 @@ function fix_len(atom fn, atom off, integer oldlen, integer len)
             aft = fpeek(fn, {next,count_after})
             if r = 1 then
                 move_to_reg = find(MOV_REG_RM, aft)
-                if and_bits(aft[move_to_reg+1], #C7) != #05 then -- проверка байта MOD R/M
+                modrm = triads(aft[move_to_reg+1])
+                -- if and_bits(aft[move_to_reg+1], #C7) != #05 then -- проверка байта MOD R/M
+                if modrm[1]!=0 and modrm[3]!=5 then -- проверка байта MOD R/M
                     move_to_reg = find(MOV_ACC_MEM, aft)
                 end if
                 
                 move_to_mem = find_from(MOV_RM_REG, aft, move_to_reg+1)
-                if and_bits(aft[move_to_mem+1], #C0) = #C0 then -- проверка байта MOD R/M
+                modrm = triads(aft[move_to_mem+1])
+                -- if and_bits(aft[move_to_mem+1], #C0) = #C0 then -- проверка байта MOD R/M
+                if modrm[1]=3 then -- проверка байта MOD R/M
                     move_to_mem = -move_to_mem
                 end if
                 
