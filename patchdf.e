@@ -301,6 +301,7 @@ function get_length(sequence s, integer len)
     sequence deleted = {}
     object dest = -1 -- {регистр, смещение} -- место назначения
     object x
+    object lea = 0
     
     while cur_len < len do
         size = 4 -- размер операнда по-умолчанию 4 байта
@@ -401,11 +402,13 @@ function get_length(sequence s, integer len)
             elsif dest[1] = x[1] and dest[2] > x[2] then
                 dest[2] = x[2]
             end if
+            
+            lea = modrm[2] & x[1..2]
         else
             return -9 -- все прочие инструкции
         end if
     end while
-    return {i-1, dest, deleted} -- {длина кода, место назначения, смещения ссылок в память}
+    return {i-1, dest, deleted, lea} -- {длина кода, место назначения, смещения ссылок в память, инструкция lea}
 end function
 
 public integer new_ref_off -- смещение ссылки на источник в генерируемом машинном коде
@@ -413,7 +416,7 @@ public integer new_ref_off -- смещение ссылки на источник в генерируемом машинно
 public
 function mach_memcpy(integer src, sequence dest, integer count) -- (адрес, {регистр, смещение}, количество байт)
     sequence mach = {}
-    integer md
+    
     -- Сохранение регистров общего назначения в стеке
     mach &= PUSHAD
     
@@ -423,27 +426,28 @@ function mach_memcpy(integer src, sequence dest, integer count) -- (адрес, {реги
     -- Если адрес места назначения еще не находится в регистре edi, кладем его туда:
     if not equal(dest,{EDI,0}) then
         -- LEA EDI, [reg+imm] :
-        mach &= LEA
-        if dest[2] = 0 and dest[1] != EBP then
-            md = 0 -- без смещения
-        elsif dest[2] >= -128 and dest[2] < 128 then
-            md = 1 -- однобайтовое смещение
-        else
-            md = 2 -- четырехбайтовое смещение
-        end if
+        mach &= lea(EDI, dest)
+        -- mach &= LEA
+        -- if dest[2] = 0 and dest[1] != EBP then
+            -- md = 0 -- без смещения
+        -- elsif dest[2] >= -128 and dest[2] < 128 then
+            -- md = 1 -- однобайтовое смещение
+        -- else
+            -- md = 2 -- четырехбайтовое смещение
+        -- end if
         
-        if dest[1] = ESP then
-            mach &= #40*md + #08*EDI + 4 -- байт mod r/m
-            mach &= 0 + #08*4 + dest[1] -- байт sib
-        else
-            mach &= #40*md + #08*EDI + dest[1] -- байт mod r/m
-        end if
+        -- if dest[1] = ESP then
+            -- mach &= #40*md + #08*EDI + 4 -- байт mod r/m
+            -- mach &= 0 + #08*4 + dest[1] -- байт sib
+        -- else
+            -- mach &= #40*md + #08*EDI + dest[1] -- байт mod r/m
+        -- end if
         
-        if md = 1 then
-            mach &= dest[2]
-        elsif md = 2 then
-            mach &= int_to_bytes(dest[2])
-        end if
+        -- if md = 1 then
+            -- mach &= dest[2]
+        -- elsif md = 2 then
+            -- mach &= int_to_bytes(dest[2])
+        -- end if
     end if
     
     mach &= (MOV_REG_IMM+8+ESI) -- MOV ESI, ...
