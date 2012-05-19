@@ -411,12 +411,13 @@ public
 function mach_memcpy(integer src, sequence dest, integer count) -- (адрес, {регистр, смещение}, количество байт)
     sequence mach = {}
     integer md
-    mach &= (XOR_RM_REG+1) & (#C0+#08*ECX+ECX) & -- XOR ECX, ECX
-        (MOV_REG_IMM+CL) & (floor(count+3)/4) -- MOV CL, IMM8
-    
-    -- Сохранение регистров esi и edi в стеке
+    -- Сохранение регистров esi, edi и ecx в стеке
     mach &= PUSH_REG + ESI
     mach &= PUSH_REG + EDI
+    mach &= PUSH_REG + ECX
+    
+    mach &= (XOR_RM_REG+1) & (#C0+#08*ECX+ECX) & -- XOR ECX, ECX
+        (MOV_REG_IMM+CL) & (floor(count+3)/4) -- MOV CL, IMM8
     
     -- Если адрес места назначения еще не находится в регистре edi, кладем его туда:
     if not equal(dest,{EDI,0}) then
@@ -450,7 +451,8 @@ function mach_memcpy(integer src, sequence dest, integer count) -- (адрес, {реги
     
     mach &= REP & MOVSD -- REP MOVSD
     
-    -- Восстановление регистров esi и edi из стека
+    -- Восстановление регистров esi, edi, ecx из стека
+    mach &= POP_REG + ECX
     mach &= POP_REG + EDI
     mach &= POP_REG + ESI
     
