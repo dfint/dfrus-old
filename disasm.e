@@ -97,3 +97,33 @@ public constant MOVSB = #A4, MOVSD = #A5, MOVSW = PREFIX_OPERAND_SIZE & MOVSD
 -- function scale_index_base(integer scale, integer ireg, integer breg)
     -- return scale*#40 + ireg*#08 + breg
 -- end function
+
+include std/convert.e
+
+public
+function lea(integer dest, sequence src)
+    integer md
+    sequence mach = {}
+    mach &= LEA
+    if src[2] = 0 and src[1] != EBP then
+        md = 0 -- без смещения
+    elsif src[2] >= -128 and src[2] < 128 then
+        md = 1 -- однобайтовое смещение
+    else
+        md = 2 -- четырехбайтовое смещение
+    end if
+    
+    if src[1] = ESP then
+        mach &= #40*md + #08*dest + 4 -- байт mod r/m
+        mach &= 0 + #08*4 + src[1] -- байт sib
+    else
+        mach &= #40*md + #08*dest + src[1] -- байт mod r/m
+    end if
+    
+    if md = 1 then
+        mach &= src[2]
+    elsif md = 2 then
+        mach &= int_to_bytes(src[2])
+    end if
+    return mach
+end function
