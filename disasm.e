@@ -28,6 +28,9 @@ public constant
 public constant
     CALL_NEAR = #E8
 
+public constant
+    RET_NEAR = #C3
+
 -- Коды условий
 public constant
     COND_O   = #0, -- Overflow
