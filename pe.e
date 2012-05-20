@@ -265,6 +265,9 @@ function modify_relocations(atom fn, object sections = 0, sequence mod)
                 seek(fn, reloc_off+cur_off) -- перейти к началу следующего/текущего блока
                 next_page = get_integer32(fn)
                 if next_page > rva then
+                    if cur_off = 0 then
+                        return mod[i] -- страницы с модифицируемым элементом нет в таблице релокаций
+                    end if
                     cur_page_off = cur_off - block_size
                     exit
                 end if
@@ -274,7 +277,7 @@ function modify_relocations(atom fn, object sections = 0, sequence mod)
                 cur_off += block_size
             end while
             if cur_page_off < 0 then
-                return -4
+                return mod[i] -- страницы с модифицируемым элементом нет в таблице релокаций
             end if
             -- считать блок релокаций:
             seek(fn, reloc_off+cur_page_off+8)
