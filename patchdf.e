@@ -168,11 +168,16 @@ function fix_len(atom fn, atom off, integer oldlen, integer len)
         if pre[$-2] = PUSH_IMM8 and pre[$-1] = oldlen then -- push len
             fpoke(fn,off-2,len)
             return 1
-        elsif pre[$] = MOV_REG_IMM + 8 + EAX and -- mov eax, offset str
-                pre[$-5] = MOV_REG_IMM + 8 + EDI and
-                bytes_to_int(pre[$-4..$-1]) = oldlen then -- mov edi,len
-            fpoke4(fn,off-5,len)
-            return 1
+        elsif pre[$] = MOV_REG_IMM + 8 + EAX then -- mov eax, offset str
+            if pre[$-5] = MOV_REG_IMM + 8 + EDI and
+                    bytes_to_int(pre[$-4..$-1]) = oldlen then -- mov edi,len ; до
+                fpoke4(fn,off-5,len)
+                return 1
+            elsif length(aft) > 0 and aft[1] = MOV_REG_IMM + 8 + EDI and
+                    bytes_to_int(aft[2..5]) = oldlen then -- mov edi,len ; после
+                fpoke4(fn,next+1,len)
+                return 1
+            end if
         elsif length(aft)>0 and aft[1] = PUSH_IMM8 and aft[2] = oldlen then -- push len
             fpoke(fn,next+1,len) -- ?
             return 1
@@ -185,9 +190,8 @@ function fix_len(atom fn, atom off, integer oldlen, integer len)
         elsif pre[$-3]=LEA and and_bits(pre[$-2],#F8)=#40+EDI*#8 and pre[$-1]=oldlen then -- lea edi, [reg+len]
             fpoke(fn, off-2, len) -- возможно, исправляет обрезание текста
             return 1
-        else
-            return -1 -- ? в остальных случаях исправлять длину не нужно ?
         end if
+        return -1 -- ? в остальных случаях исправлять длину не нужно ?
     elsif pre[$] = MOV_ACC_MEM+1 or pre[$-1] = MOV_REG_RM+1 then -- mov eax, [] или mov reg, []
         if len > oldlen and len+1 <= align(oldlen+1) then
             r = remainder(oldlen+1,4)
