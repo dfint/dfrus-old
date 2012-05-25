@@ -4,6 +4,7 @@ include std/get.e
 include std/search.e
 include std/convert.e
 include std/map.e
+include std/error.e
 
 include patcher.e
 include pe.e
@@ -118,14 +119,13 @@ end function
 -- Функция находит начало кода, копирующего данную строку
 public
 function get_start(sequence pre)
-    -- sequence pre = fpeek(fn, {off-count,count})
     integer i = 0
     if and_bits(pre[$-i],#FE) = MOV_ACC_MEM then
         i += 1
     elsif and_bits(pre[$-i-1],#F8) = MOV_RM_REG and and_bits(pre[$-i],#C7) = #05 then
         i += 2
     else
-        return #DEADBEEF
+        crash("Failed to find beginning of the instruction: %02x %02x %02x\n",pre)
     end if
     
     if pre[$-i] = PREFIX_OPERAND_SIZE then
