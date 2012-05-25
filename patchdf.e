@@ -95,8 +95,7 @@ function get_cross_references(atom fn, sequence relocs, sequence sections, atom 
             continue
         end if
         relocs[i] += sections[code][SECTION_POFFSET]
-        
-        -- Читываем адрес объекта и преобразуем его в смещение от начала файла:
+        -- Считываем адрес объекта и преобразуем его в смещение от начала файла:
         obj = rva_to_off(fpeek4u(fn, relocs[i]) - image_base, sections)
         -- Проверяем, находится ли адрес в секциях .rdata или .data:
         if obj >= sections[rdata][SECTION_POFFSET] and obj < sections[data][SECTION_POFFSET]+sections[data][SECTION_PSIZE] then
@@ -167,6 +166,9 @@ function fix_len(atom fn, atom off, integer oldlen, integer len)
     elsif and_bits(pre[$], #F8) = MOV_REG_IMM + 8 then -- mov reg, offset str
         if pre[$-2] = PUSH_IMM8 and pre[$-1] = oldlen then -- push len
             fpoke(fn,off-2,len)
+            return 1
+        elsif length(aft)>0 and aft[1] = PUSH_IMM8 and aft[2] = oldlen then -- push len
+            fpoke(fn,next+1,len)
             return 1
         elsif pre[$] = MOV_REG_IMM + 8 + EAX then -- mov eax, offset str
             if pre[$-5] = MOV_REG_IMM + 8 + EDI and
