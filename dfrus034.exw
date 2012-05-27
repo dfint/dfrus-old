@@ -7,7 +7,7 @@ include std/get.e
 include std/sequence.e
 include std/map.e
 
--- with trace
+with trace
 include patcher.e
 include pe.e
 include disasm.e
@@ -201,9 +201,11 @@ for i = 1 to length(strings) do
     
     if length(strings[i][2])>=length(translation) then
         -- Прописать перевод поверх оригинала
-        for j=1 to length(s) do
-            fix_len(fn, s[j], length(strings[i][2]), length(translation))
-        end for
+        if length(strings[i][2])>length(translation) then
+            for j=1 to length(s) do
+                fix_len(fn, s[j], length(strings[i][2]), length(translation))
+            end for
+        end if
         extra = length(strings[i][2])-length(translation) -- количество незадействованных байт
         fpoke(fn, strings[i][1], translation & repeat(0, extra+1)) -- назадействованные байты заполнить нулями
     else
