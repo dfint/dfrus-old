@@ -146,7 +146,7 @@ include disasm.e
 constant count = #18, count_after = #40
 public
 function fix_len(atom fn, atom off, integer oldlen, integer len)
-    atom operand, next = off+4
+    atom next = off+4
     sequence pre = fpeek(fn, {off-count,count}),
              aft = fpeek(fn, {next,count})
     integer r, reg
