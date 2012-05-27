@@ -2,6 +2,7 @@
 
 include std/get.e
 include std/search.e
+include std/sequence.e
 
 constant lookup_table = {
     {"quot","lt","rt","amp"},
@@ -27,6 +28,10 @@ function convert_special_symbols(sequence s)
     return s
 end function
 
+function fst(sequence s)
+    return s[1]
+end function
+
 atom fn,fnout
 object line,x
 
@@ -37,9 +42,14 @@ while 1 do
     if atom(line) then
         exit
     end if
-    x = value('#'&line)
-    if x[1] = GET_SUCCESS or line[1]='|' then
-        line = convert_special_symbols(line)
+    x = split(line, '|')
+    if length(x)>=3 then
+        if fst(value('#'&x[1])) != GET_SUCCESS then
+            x[1] = ""
+        end if
+        x[2] = convert_special_symbols(x[2])
+        x[3] = convert_special_symbols(x[3])
+        line = x[1] & '|' & x[2] & '|' & x[3] & "|\n"
         puts(fnout,line)
     end if
 end while
