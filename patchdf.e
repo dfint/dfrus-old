@@ -185,9 +185,9 @@ function fix_len(atom fn, atom off, integer oldlen, integer len)
                 if disp=oldlen then
                     fpoke(fn, off-2, len)
                     return 1
-                else
-                    fpoke(fn, off-2, len-oldlen+disp) -- Экспериментально, нужно тестирование !!!
-                    return 1
+                -- else
+                    -- fpoke(fn, off-2, len-oldlen+disp) -- Экспериментально, нужно тестирование !!!
+                    -- return 1
                 end if
             end if
         elsif reg = ESI and -- mov esi, offset str
