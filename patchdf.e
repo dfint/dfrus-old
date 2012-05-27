@@ -180,9 +180,6 @@ function fix_len(atom fn, atom off, integer oldlen, integer len)
                 fpoke4(fn,next+1,len)
                 return 1
             end if
-        elsif length(aft)>0 and aft[1] = PUSH_IMM8 and aft[2] = oldlen then -- push len
-            fpoke(fn,next+1,len) -- ?
-            return 1
         elsif pre[$] = MOV_REG_IMM + 8 + ESI and
                 pre[$-5] = MOV_REG_IMM + 8 + ECX and
                     bytes_to_int(pre[$-4..$-1]) = floor(oldlen/4) then -- а дальше rep movsd
