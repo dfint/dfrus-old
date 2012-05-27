@@ -180,9 +180,15 @@ function fix_len(atom fn, atom off, integer oldlen, integer len)
                     bytes_to_int(aft[2..5]) = oldlen then -- mov edi,len ; после
                 fpoke4(fn,next+1,len)
                 return 1
-            elsif pre[$-3]=LEA and and_bits(pre[$-2],#F8)=#40+EDI*#8 and pre[$-1]=oldlen then -- lea edi, [reg+len]
-                fpoke(fn, off-2, len) -- возможно, исправляет обрезание текста
-                return 1
+            elsif pre[$-3]=LEA and and_bits(pre[$-2],#F8)=#40+EDI*#8 then -- lea edi, [reg+len]
+                integer disp = check_sign_bit(pre[$-1],8)
+                if disp=oldlen then
+                    fpoke(fn, off-2, len)
+                    return 1
+                else
+                    fpoke(fn, off-2, len-oldlen+disp) -- Экспериментально, нужно тестирование !!!
+                    return 1
+                end if
             end if
         elsif reg = ESI and -- mov esi, offset str
                 pre[$-5] = MOV_REG_IMM + 8 + ECX and
@@ -200,7 +206,6 @@ function fix_len(atom fn, atom off, integer oldlen, integer len)
             if r = 1 then
                 move_to_reg = find(MOV_REG_RM, aft)
                 modrm = triads(aft[move_to_reg+1])
-                -- if and_bits(aft[move_to_reg+1], #C7) != #05 then -- проверка байта MOD R/M
                 if modrm[1]!=0 and modrm[3]!=5 then -- проверка байта MOD R/M
                     move_to_reg = find(MOV_ACC_MEM, aft)
                 end if
@@ -210,7 +215,6 @@ function fix_len(atom fn, atom off, integer oldlen, integer len)
                     return 0
                 end if
                 modrm = triads(aft[move_to_mem+1])
-                -- if and_bits(aft[move_to_mem+1], #C0) = #C0 then -- проверка байта MOD R/M
                 if modrm[1]=3 then -- проверка байта MOD R/M
                     move_to_mem = -move_to_mem
                 end if
@@ -257,6 +261,14 @@ function triads(integer x)
     return and_bits(floor(x/{#40,#08,#1}), #7)
 end function
 
+-- В соответствии с битом знака изменить знак числа
+function check_sign_bit(atom x, integer w)
+    if and_bits(x, power(2, w-1)) then
+        x -= power(2, w)
+    end if
+    return x
+end function
+
 -- Обработать байт sib и непосредственный операнд
 function process_operands(sequence s, integer i, sequence modrm)
     sequence sib
@@ -278,16 +290,10 @@ function process_operands(sequence s, integer i, sequence modrm)
     if modrm[1] = 0 then -- без смещения
         disp = 0
     elsif modrm[1] = 1 then -- однобайтовое смещение
-        disp = s[i]
-        if and_bits(disp, #80) then -- проверка бита знака
-            disp -= #100
-        end if
+        disp = check_sign_bit(s[i], 8)
         i += 1 -- смещение 1 байт
     else -- четырехбайтовое смещение
-        disp = bytes_to_int(s[i..i+3])
-        if and_bits(disp, #80000000) then -- проверка бита знака
-            disp -= #100000000
-        end if
+        disp = check_sign_bit(bytes_to_int(s[i..i+3]), 32)
         i += 4 -- смещение 4 байта
     end if
     
