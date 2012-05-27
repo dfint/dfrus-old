@@ -149,7 +149,7 @@ function fix_len(atom fn, atom off, integer oldlen, integer len)
     atom operand, next = off+4
     sequence pre = fpeek(fn, {off-count,count}),
              aft = fpeek(fn, {next,count})
-    integer r
+    integer r, reg
     integer move_to_reg, move_to_mem, opcode
     sequence modrm
     
@@ -164,14 +164,15 @@ function fix_len(atom fn, atom off, integer oldlen, integer len)
     if pre[$] = PUSH_IMM32 then -- push offset str
         return -1 -- передача строки по ссылке, исправлять не нужно
     elsif and_bits(pre[$], #F8) = MOV_REG_IMM + 8 then -- mov reg, offset str
-        if pre[$-2] = PUSH_IMM8 and pre[$-1] = oldlen then -- push len
-            fpoke(fn,off-2,len)
-            return 1
-        elsif length(aft)>0 and aft[1] = PUSH_IMM8 and aft[2] = oldlen then -- push len
-            fpoke(fn,next+1,len)
-            return 1
-        elsif pre[$] = MOV_REG_IMM + 8 + EAX then -- mov eax, offset str
-            if pre[$-5] = MOV_REG_IMM + 8 + EDI and
+        reg = and_bits(pre[$], #7)
+        if reg = EAX then -- mov eax, offset str
+            if pre[$-2] = PUSH_IMM8 and pre[$-1] = oldlen then -- push len
+                fpoke(fn,off-2,len)
+                return 1
+            elsif length(aft)>0 and aft[1] = PUSH_IMM8 and aft[2] = oldlen then -- push len
+                fpoke(fn,next+1,len)
+                return 1
+            elsif pre[$-5] = MOV_REG_IMM + 8 + EDI and
                     bytes_to_int(pre[$-4..$-1]) = oldlen then -- mov edi,len ; до
                 fpoke4(fn,off-5,len)
                 return 1
@@ -179,15 +180,15 @@ function fix_len(atom fn, atom off, integer oldlen, integer len)
                     bytes_to_int(aft[2..5]) = oldlen then -- mov edi,len ; после
                 fpoke4(fn,next+1,len)
                 return 1
+            elsif pre[$-3]=LEA and and_bits(pre[$-2],#F8)=#40+EDI*#8 and pre[$-1]=oldlen then -- lea edi, [reg+len]
+                fpoke(fn, off-2, len) -- возможно, исправляет обрезание текста
+                return 1
             end if
-        elsif pre[$] = MOV_REG_IMM + 8 + ESI and
+        elsif reg = ESI and -- mov esi, offset str
                 pre[$-5] = MOV_REG_IMM + 8 + ECX and
                     bytes_to_int(pre[$-4..$-1]) = floor(oldlen/4) then -- а дальше rep movsd
             r = remainder(oldlen+1,4)
             fpoke4(fn, off-5, floor((len+1-r+3)/4)) -- с учетом инструкций, копирующих остаток строки
-            return 1
-        elsif pre[$-3]=LEA and and_bits(pre[$-2],#F8)=#40+EDI*#8 and pre[$-1]=oldlen then -- lea edi, [reg+len]
-            fpoke(fn, off-2, len) -- возможно, исправляет обрезание текста
             return 1
         end if
         return -1 -- ? в остальных случаях исправлять длину не нужно ?
