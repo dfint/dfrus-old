@@ -133,7 +133,7 @@ function get_start(sequence pre)
     return i
 end function
 
--- ќкруглить n до ближайшего числа, кратного edge и большего чем n
+-- ќкруглить n до ближайшего числа, кратного edge, большего или равного n
 public
 function align(atom n, atom edge = 4)
     return and_bits(n+edge-1, -edge)
@@ -435,29 +435,13 @@ function mach_memcpy(integer src, sequence dest, integer count) -- (адрес, {реги
     
     -- ≈сли адрес места назначени€ еще не находитс€ в регистре edi, кладем его туда:
     if not equal(dest,{EDI,0}) then
-        -- LEA EDI, [reg+imm] :
-        mach &= lea(EDI, dest)
-        -- mach &= LEA
-        -- if dest[2] = 0 and dest[1] != EBP then
-            -- md = 0 -- без смещени€
-        -- elsif dest[2] >= -128 and dest[2] < 128 then
-            -- md = 1 -- однобайтовое смещение
-        -- else
-            -- md = 2 -- четырехбайтовое смещение
-        -- end if
-        
-        -- if dest[1] = ESP then
-            -- mach &= #40*md + #08*EDI + 4 -- байт mod r/m
-            -- mach &= 0 + #08*4 + dest[1] -- байт sib
-        -- else
-            -- mach &= #40*md + #08*EDI + dest[1] -- байт mod r/m
-        -- end if
-        
-        -- if md = 1 then
-            -- mach &= dest[2]
-        -- elsif md = 2 then
-            -- mach &= int_to_bytes(dest[2])
-        -- end if
+        if dest[2] != 0 then
+            -- LEA EDI, [reg+imm] :
+            mach &= lea(EDI, dest)
+        else
+            -- MOV EDI, reg
+            mach &= (MOV_RM_REG+1) & (#C0+#08*dest[1]+EDI)
+        end if
     end if
     
     mach &= (MOV_REG_IMM+8+ESI) -- MOV ESI, ...
