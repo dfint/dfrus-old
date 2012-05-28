@@ -161,7 +161,9 @@ sequence strings = extract_strings(fn, xref_table)
 if debug then
     printf(1,"%d strings extracted.\n", length(strings))
     if length(cmd)>=5 then
-        strings = strings[second(value(cmd[4]))..second(value(cmd[5]))]
+        integer lo=second(value(cmd[4])), hi=second(value(cmd[5]))
+        strings = strings[lo..hi]
+        printf(1,"%d %d %d\n",{lo,floor((lo+hi)/2),hi})
         printf(1,"From %x to %x total %d\n",{strings[1][1], strings[$][1], length(strings)})
     end if
 end if
