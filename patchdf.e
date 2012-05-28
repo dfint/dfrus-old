@@ -185,9 +185,10 @@ function fix_len(atom fn, atom off, integer oldlen, integer len)
                 if disp=oldlen then
                     fpoke(fn, off-2, len)
                     return 1
-                -- else
-                    -- fpoke(fn, off-2, len-oldlen+disp) -- Экспериментально, нужно тестирование !!!
-                    -- return 1
+                elsif and_bits(pre[$-2],#07) != ESP then -- не адрес локальной переменной
+                    -- ? and_bits(pre[$-2],#07) & disp & off
+                    fpoke(fn, off-2, len-oldlen+disp) -- Экспериментально, нужно тестирование !!!
+                    return 1
                 end if
             end if
         elsif reg = ESI and -- mov esi, offset str
