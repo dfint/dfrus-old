@@ -191,12 +191,18 @@ function fix_len(atom fn, atom off, integer oldlen, integer len)
                     return 1
                 end if
             end if
-        elsif reg = ESI and -- mov esi, offset str
-                pre[$-5] = MOV_REG_IMM + 8 + ECX and
-                    bytes_to_int(pre[$-4..$-1]) = floor(oldlen/4) then -- а дальше rep movsd
-            r = remainder(oldlen+1,4)
-            fpoke4(fn, off-5, floor((len+1-r+3)/4)) -- с учетом инструкций, копирующих остаток строки
-            return 1
+        elsif reg = ESI then -- mov esi, offset str
+            if pre[$-5] = MOV_REG_IMM + 8 + ECX and
+                    bytes_to_int(pre[$-4..$-1]) = floor((oldlen+1)/4) then
+                r = remainder(oldlen+1,4)
+                fpoke4(fn, off-5, floor((len+1-r+3)/4)) -- с учетом инструкций, копирующих остаток строки
+                return 1
+            elsif pre[$-3] = LEA and and_bits(pre[$-2],#F8)=#40+ECX*#8 and pre[$-1]=floor((oldlen+1)/4) then
+                r = remainder(oldlen+1,4)
+                fpoke(fn, off-2, floor((len+1-r+3)/4))
+            end if
+        -- else
+            -- ? reg & off
         end if
         return -1 -- ? в остальных случаях исправлять длину не нужно ?
     elsif pre[$] = MOV_ACC_MEM+1 or pre[$-1] = MOV_REG_RM+1 then -- mov eax, [] или mov reg, []
