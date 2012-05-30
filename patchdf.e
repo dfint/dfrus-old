@@ -307,6 +307,64 @@ function process_operands(sequence s, integer i, sequence modrm)
     return {basereg, disp, i}
 end function
 
+function analize_modrm(sequence s, integer i)
+    sequence modrm, sib
+    sequence result
+    atom disp = 0
+    modrm = triads(s[i])
+    i += 1
+    result = {modrm}
+    if modrm[1] != 3 then -- Не регистровая адресация
+        if modrm[1] = 0 and modrm[3] = 5 then
+            -- Прямая адресация [imm32]
+            result &= bytes_to_int(s[i..i+3])
+        else
+            if modrm[3] = 4 then
+                -- Косвенная адресация по базе с масштабированием
+                sib = triads(s[i])
+                i += 1
+                result = append(result, sib)
+            end if
+            
+            if modrm[1] = 1 then
+                disp = check_sign_bit(s[i], 8)
+                i += 1
+                result &= disp
+            else
+                disp = check_sign_bit(bytes_to_int(s[i..i+3]), 32)
+                i += 4
+                result &= disp
+            end if
+        end if
+    end if
+    return result & i
+end function
+
+-- Попытка вынести анализирующий код в отдельную функцию
+function analize_mach(sequence s, integer i=1)
+    integer size = 4, op
+    sequence modrm, sib
+    sequence result
+    if s[i] = PREFIX_OPERAND_SIZE then
+        size = 2
+        i += 1
+    end if
+    -- Префикс смены режима адресации пока не поддерживается
+    op = s[i]
+    result = {s[1..i]}
+    i += 1
+    if and_bits(op, #FE) = MOV_ACC_MEM then
+        result &= {bytes_to_int(s[i..i+3]), i+4}
+    elsif and_bits(op, #FC) = MOV_RM_REG then
+        result &= analize_modrm(s, i)
+    elsif op = LEA then
+        result &= analize_modrm(s, i)
+    else
+        return -1
+    end if
+    return result
+end function
+
 -- Определить длину (в байтах) инструкций, копирующих строку, также нужно определить куда копируется строка
 public
 function get_length(sequence s, integer len)
