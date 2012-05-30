@@ -342,11 +342,10 @@ end function
 
 -- Попытка вынести анализирующий код в отдельную функцию
 function analize_mach(sequence s, integer i=1)
-    integer size = 4, op
+    integer op
     sequence modrm, sib
     sequence result
     if s[i] = PREFIX_OPERAND_SIZE then
-        size = 2
         i += 1
     end if
     -- Префикс смены режима адресации пока не поддерживается
