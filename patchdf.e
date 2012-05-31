@@ -246,11 +246,11 @@ function fix_len(atom fn, atom off, integer oldlen, integer len)
                 end if
             end if
         else
-            -- stub
+            return 0 -- Ќе удалось исправить длину, необходимо править код
         end if
     end if
     
-    return 0
+    return -1 -- —читаем, что во всех остальных случа€х исправление длины не требуетс€
 end function
 
 public
