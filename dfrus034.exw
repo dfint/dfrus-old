@@ -181,12 +181,12 @@ for i = 1 to length(strings) do
     end if
     -- Поиск строки в таблице объектов:
     k = binary_search(strings[i][1], objs)
-    if k <= 0 then
-        if debug then
-            printf(1, "Warning: References to string at %x offset not found.\n", strings[i][1])
-        end if
-        continue
-    end if
+    -- if k <= 0 then
+        -- if debug then
+            -- printf(1, "Warning: References to string at %x offset not found.\n", strings[i][1])
+        -- end if
+        -- continue
+    -- end if
     s = xrefs[k] -- список ссылок на данную строку
     
     -- Находим ссылки на середину строки
