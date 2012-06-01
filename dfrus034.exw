@@ -208,8 +208,7 @@ for i = 1 to length(strings) do
                 fix_len(fn, s[j], length(strings[i][2]), length(translation))
             end for
         end if
-        extra = length(strings[i][2])-length(translation) -- количество незадействованных байт
-        fpoke(fn, strings[i][1], translation & repeat(0, extra+1)) -- назадействованные байты заполнить нулями
+        fpoke(fn, strings[i][1], pad_tail(translation, length(strings[i][2])+1, 0) -- назадействованные байты заполнить нулями
     else
         long = align(length(strings[i][2])+1)<length(translation)+1
         if not long then
