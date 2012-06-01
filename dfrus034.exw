@@ -155,7 +155,7 @@ atom str_off = new_section[SECTION_POFFSET]
 puts(1,"Translating...\n")
 
 sequence s, pre, mach
-integer aligned = 0, k, l, extra, delta, start, long
+integer aligned = 0, k, l, delta, start, long, alen
 object x, translation
 sequence strings = extract_strings(fn, xref_table)
 if debug then
@@ -181,12 +181,6 @@ for i = 1 to length(strings) do
     end if
     -- Поиск строки в таблице объектов:
     k = binary_search(strings[i][1], objs)
-    -- if k <= 0 then
-        -- if debug then
-            -- printf(1, "Warning: References to string at %x offset not found.\n", strings[i][1])
-        -- end if
-        -- continue
-    -- end if
     s = xrefs[k] -- список ссылок на данную строку
     
     -- Находим ссылки на середину строки
@@ -201,74 +195,65 @@ for i = 1 to length(strings) do
         l += 1
     end while
     
-    -- if length(strings[i][2])>=length(translation) then
-        -- -- Прописать перевод поверх оригинала
-        -- if length(strings[i][2])>length(translation) then
-            -- for j=1 to length(s) do
-                -- fix_len(fn, s[j], length(strings[i][2]), length(translation))
-            -- end for
-        -- end if
-        -- fpoke(fn, strings[i][1], pad_tail(translation, length(strings[i][2])+1, 0) -- назадействованные байты заполнить нулями
-    -- else
-        long = align(length(strings[i][2])+1)<length(translation)+1
-        if not long then
-            -- Если строка достаточно короткая, то записать ее поверх старой:
-            fpoke(fn, strings[i][1], pad_tail(translation & 0, length(strings[i][2]), 0)) -- назадействованные байты (если таковые имеются) заполнить нулями
-        else
-            -- Если строка длинная, то записать ее в специально отведенную для этого секцию:
-            str_off += aligned
-            aligned = align(length(translation)+1)
-            fpoke(fn, str_off, pad_tail(translation, aligned, 0))
-        end if
-        
-        for j = 1 to length(s) do
-            -- Исправить длину строки:
-            if fix_len(fn, s[j], length(strings[i][2]), length(translation)) then
-                if long then -- Если строка длинная,
-                    -- то исправить ссылку на строку в коде:
-                    fix_off(fn, s[j], off_to_rva_ex(str_off, new_section)+image_base)
+    alen = align(length(strings[i][2])+1) -- Максимальная длина "короткой" строки
+    long = alen<length(translation)+1
+    if not long then
+        -- Если строка достаточно короткая, то записать ее поверх старой:
+        fpoke(fn, strings[i][1], pad_tail(translation & 0, alen, 0)) -- назадействованные байты заполнить нулями
+    else
+        -- Если строка длинная, то записать ее в специально отведенную для этого секцию:
+        str_off += aligned
+        aligned = align(length(translation)+1)
+        fpoke(fn, str_off, pad_tail(translation, aligned, 0))
+    end if
+    
+    for j = 1 to length(s) do
+        -- Исправить длину строки:
+        if fix_len(fn, s[j], length(strings[i][2]), length(translation)) then
+            if long then -- Если строка длинная,
+                -- то исправить ссылку на строку в коде:
+                fix_off(fn, s[j], off_to_rva_ex(str_off, new_section)+image_base)
+            end if
+        elsif long then -- Если не удалось исправить длину:
+            -- Считываем 3 байта перед ссылкой для нахождения начала копирующего кода
+            pre = fpeek(fn, {s[j]-3, 3})
+            -- Находим начало копирующего кода:
+            start = s[j]-get_start(pre)
+            -- Получаем длину кода, копирующего строку:
+            x = get_length( fpeek(fn, {start, 100}), length(strings[i][2])+1)
+            
+            if sequence(x) then
+                -- Получаем машинный код, копирующий строку:
+                mach = mach_memcpy(off_to_rva_ex(str_off, new_section)+image_base, x[2], length(translation)+1)
+                if sequence(x[4]) then
+                    mach &= lea(x[4][1],x[4][2..3])
                 end if
-            elsif long then -- Если не удалось исправить длину:
-                -- Считываем 3 байта перед ссылкой для нахождения начала копирующего кода
-                pre = fpeek(fn, {s[j]-3, 3})
-                -- Находим начало копирующего кода:
-                start = s[j]-get_start(pre)
-                -- Получаем длину кода, копирующего строку:
-                x = get_length( fpeek(fn, {start, 100}), length(strings[i][2])+1)
-                
-                if sequence(x) then
-                    -- Получаем машинный код, копирующий строку:
-                    mach = mach_memcpy(off_to_rva_ex(str_off, new_section)+image_base, x[2], length(translation)+1)
-                    if sequence(x[4]) then
-                        mach &= lea(x[4][1],x[4][2..3])
-                    end if
-                    if length(mach) > x[1] then
-                        if debug then
-                            printf(1,"%x|%s|%s| <- %x (%x)\n",
-                                strings[i] & {translation} & s[j] & ( off_to_rva_ex(s[j], sections[1])+image_base ) )
-                            printf(1, "Mach code is too long (%d against %d).\n",{length(mach),x[1]})
-                        end if
-                        continue -- полученный машинный код не уместился
-                    end if
-                    mach = pad_tail(mach, x[1], NOP) -- добиваем освободившиеся байты пустыми командами
-                    fpoke(fn, start, mach) -- патчим код!
-                    -- Исправляем битые релокации --
-                    -- Преобразуем смещение начала измененного кода в его относительный адрес:
-                    start = off_to_rva_ex(start, sections[1])
-                    x[3] += start-1 -- получаем адреса удаленных ссылок
-                    if modify_relocations(fn, sections, (-x[3]) & (start+new_ref_off)) != 0 and debug then
+                if length(mach) > x[1] then
+                    if debug then
                         printf(1,"%x|%s|%s| <- %x (%x)\n",
                             strings[i] & {translation} & s[j] & ( off_to_rva_ex(s[j], sections[1])+image_base ) )
-                        puts(1, "Failed to fix relocations.\n")
+                        printf(1, "Mach code is too long (%d against %d).\n",{length(mach),x[1]})
                     end if
-                elsif debug then
+                    continue -- полученный машинный код не уместился
+                end if
+                mach = pad_tail(mach, x[1], NOP) -- добиваем освободившиеся байты пустыми командами
+                fpoke(fn, start, mach) -- патчим код!
+                -- Исправляем битые релокации --
+                -- Преобразуем смещение начала измененного кода в его относительный адрес:
+                start = off_to_rva_ex(start, sections[1])
+                x[3] += start-1 -- получаем адреса удаленных ссылок
+                if modify_relocations(fn, sections, (-x[3]) & (start+new_ref_off)) != 0 and debug then
                     printf(1,"%x|%s|%s| <- %x (%x)\n",
                         strings[i] & {translation} & s[j] & ( off_to_rva_ex(s[j], sections[1])+image_base ) )
-                    printf(1,"Failed to obtain copying code length (Error code %d).\n",x)
+                    puts(1, "Failed to fix relocations.\n")
                 end if
+            elsif debug then
+                printf(1,"%x|%s|%s| <- %x (%x)\n",
+                    strings[i] & {translation} & s[j] & ( off_to_rva_ex(s[j], sections[1])+image_base ) )
+                printf(1,"Failed to obtain copying code length (Error code %d).\n",x)
             end if
-        end for
-    -- end if
+        end if
+    end for
 end for
 str_off+=aligned
 
