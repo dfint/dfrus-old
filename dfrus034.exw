@@ -201,19 +201,19 @@ for i = 1 to length(strings) do
         l += 1
     end while
     
-    if length(strings[i][2])>=length(translation) then
-        -- Прописать перевод поверх оригинала
-        if length(strings[i][2])>length(translation) then
-            for j=1 to length(s) do
-                fix_len(fn, s[j], length(strings[i][2]), length(translation))
-            end for
-        end if
-        fpoke(fn, strings[i][1], pad_tail(translation, length(strings[i][2])+1, 0) -- назадействованные байты заполнить нулями
-    else
+    -- if length(strings[i][2])>=length(translation) then
+        -- -- Прописать перевод поверх оригинала
+        -- if length(strings[i][2])>length(translation) then
+            -- for j=1 to length(s) do
+                -- fix_len(fn, s[j], length(strings[i][2]), length(translation))
+            -- end for
+        -- end if
+        -- fpoke(fn, strings[i][1], pad_tail(translation, length(strings[i][2])+1, 0) -- назадействованные байты заполнить нулями
+    -- else
         long = align(length(strings[i][2])+1)<length(translation)+1
         if not long then
             -- Если строка достаточно короткая, то записать ее поверх старой:
-            fpoke(fn, strings[i][1], translation & 0)
+            fpoke(fn, strings[i][1], pad_tail(translation & 0, length(strings[i][2]), 0)) -- назадействованные байты (если таковые имеются) заполнить нулями
         else
             -- Если строка длинная, то записать ее в специально отведенную для этого секцию:
             str_off += aligned
@@ -228,7 +228,7 @@ for i = 1 to length(strings) do
                     -- то исправить ссылку на строку в коде:
                     fix_off(fn, s[j], off_to_rva_ex(str_off, new_section)+image_base)
                 end if
-            else -- Если не удалось исправить длину:
+            elsif long then -- Если не удалось исправить длину:
                 -- Считываем 3 байта перед ссылкой для нахождения начала копирующего кода
                 pre = fpeek(fn, {s[j]-3, 3})
                 -- Находим начало копирующего кода:
@@ -268,7 +268,7 @@ for i = 1 to length(strings) do
                 end if
             end if
         end for
-    end if
+    -- end if
 end for
 str_off+=aligned
 
