@@ -209,7 +209,13 @@ for i = 1 to length(strings) do
     
     for j = 1 to length(s) do
         -- Исправить длину строки:
-        if fix_len(fn, s[j], length(strings[i][2]), length(translation)) then
+        integer fix = fix_len(fn, s[j], length(strings[i][2]), length(translation))
+        if fix != 0 then
+            if fix = -2 and debug then
+                printf(1,"|%s|%s| <- %x (%x)\n",
+                    {strings[i][2], translation} & s[j] & ( off_to_rva_ex(s[j], sections[1])+image_base ) )
+                puts(1, "Failed to fix length.\n")
+            end if
             if long then -- Если строка длинная,
                 -- то исправить ссылку на строку в коде:
                 fix_off(fn, s[j], off_to_rva_ex(str_off, new_section)+image_base)
@@ -230,8 +236,8 @@ for i = 1 to length(strings) do
                 end if
                 if length(mach) > x[1] then
                     if debug then
-                        printf(1,"%x|%s|%s| <- %x (%x)\n",
-                            strings[i] & {translation} & s[j] & ( off_to_rva_ex(s[j], sections[1])+image_base ) )
+                printf(1,"|%s|%s| <- %x (%x)\n",
+                    {strings[i][2], translation} & s[j] & ( off_to_rva_ex(s[j], sections[1])+image_base ) )
                         printf(1, "Mach code is too long (%d against %d).\n",{length(mach),x[1]})
                     end if
                     continue -- полученный машинный код не уместился
@@ -243,13 +249,13 @@ for i = 1 to length(strings) do
                 start = off_to_rva_ex(start, sections[1])
                 x[3] += start-1 -- получаем адреса удаленных ссылок
                 if modify_relocations(fn, sections, (-x[3]) & (start+new_ref_off)) != 0 and debug then
-                    printf(1,"%x|%s|%s| <- %x (%x)\n",
-                        strings[i] & {translation} & s[j] & ( off_to_rva_ex(s[j], sections[1])+image_base ) )
+                printf(1,"|%s|%s| <- %x (%x)\n",
+                    {strings[i][2], translation} & s[j] & ( off_to_rva_ex(s[j], sections[1])+image_base ) )
                     puts(1, "Failed to fix relocations.\n")
                 end if
             elsif debug then
-                printf(1,"%x|%s|%s| <- %x (%x)\n",
-                    strings[i] & {translation} & s[j] & ( off_to_rva_ex(s[j], sections[1])+image_base ) )
+                printf(1,"|%s|%s| <- %x (%x)\n",
+                    {strings[i][2], translation} & s[j] & ( off_to_rva_ex(s[j], sections[1])+image_base ) )
                 printf(1,"Failed to obtain copying code length (Error code %d).\n",x)
             end if
         end if
