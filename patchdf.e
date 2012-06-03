@@ -200,7 +200,7 @@ function fix_len(atom fn, atom off, integer oldlen, integer len)
             elsif pre[$-3] = LEA and and_bits(pre[$-2],#F8)=#40+ECX*#8 and pre[$-1]=floor((oldlen+1)/4) then
                 r = remainder(oldlen+1,4)
                 fpoke(fn, off-2, floor((len+1-r+3)/4))
-            else
+            elsif len > oldlen then
                 return -2 -- Ќе удалось исправить, хот€ скорее всего нужно
             end if
         -- else
@@ -525,7 +525,7 @@ end function
 constant blocksize = 1024
 
 function forbidden(integer i)
-    return find(i,"$;<>@^_`{|}")
+    return find(i,"$;<>@^`{|}")
 end function
 
 function allowed(integer i)
