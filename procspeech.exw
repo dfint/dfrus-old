@@ -1,0 +1,44 @@
+-- Утилита для разбивки скачанного файла speech на отдельные файлы
+include std/search.e
+include std/text.e
+include std/sequence.e
+include std/error.e
+include std/filesys.e
+
+constant path = "data\\speech"
+if length(path)>0 and atom(dir(path)) then
+    create_directory(path)
+end if
+
+atom fn = -1
+integer on = 0
+while 1 do
+    object line = gets(0)
+    if atom(line) then
+        exit
+    end if
+    if begins("==",line) then
+        if fn > 0 then
+            close(fn)
+        end if
+        sequence fname = trim(line[3..$-3], " ")
+        fn = open(path & '\\' & fname, "w")
+        if fn < 0 then
+            crash("Failed to open %s file.\n",{fname})
+        end if
+    elsif fn > 0 and not begins(line, "&lt;") then
+        if begins("&lt;pre&gt;",line) then
+            on = 1
+        elsif begins("&lt;/pre&gt;",line) then
+            on = 0
+        elsif on then
+            line = split(line,'|')
+            if length(line)>1 then
+                puts(fn,line[2]&'\n')
+            end if
+        end if
+    end if
+end while
+if fn>0 then
+    close(fn)
+end if
