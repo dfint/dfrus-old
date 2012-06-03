@@ -5,7 +5,7 @@ include std/sequence.e
 include std/error.e
 include std/filesys.e
 
-constant path = "data\\speech"
+constant path = "data\\speechru"
 if length(path)>0 and atom(dir(path)) then
     create_directory(path)
 end if
@@ -26,7 +26,7 @@ while 1 do
         if fn < 0 then
             crash("Failed to open %s file.\n",{fname})
         end if
-    elsif fn > 0 and not begins(line, "&lt;") then
+    elsif fn > 0 then
         if begins("&lt;pre&gt;",line) then
             on = 1
         elsif begins("&lt;/pre&gt;",line) then
