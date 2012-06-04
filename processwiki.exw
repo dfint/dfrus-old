@@ -5,7 +5,7 @@ include std/search.e
 include std/sequence.e
 
 constant lookup_table = {
-    {"quot","lt","rt","amp"},
+    {"quot","lt","gt","amp"},
     {"\"","<",">","&"}
 }
 
@@ -18,11 +18,13 @@ function convert_special_symbols(sequence s)
             exit
         end if
         j = find(';',s,i+1)
-        s = replace(s,
-            lookup(s[i+1..j-1],
-                lookup_table[1], 
-                lookup_table[2]),
-            i, j)
+        if j = 0 then
+            continue
+        end if
+        object x = lookup(s[i+1..j-1], lookup_table[1], lookup_table[2])
+        if sequence(x) then
+            s = replace(s, x, i, j)
+        end if
         from = i+1
     end while
     return s
