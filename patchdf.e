@@ -215,7 +215,7 @@ function fix_len(atom fn, atom off, integer oldlen, integer len)
             integer i = 1, flag = 0
             reg = -1
             while i < length(aft) and flag < 2 do
-                object x = analize_mach(aft,i)
+                object x = analyse_mach(aft,i)
                 if atom(x) then
                     return 0
                 end if
@@ -326,7 +326,7 @@ function process_operands(sequence s, integer i, sequence modrm)
     return {basereg, disp, i}
 end function
 
-function analize_modrm(sequence s, integer i)
+function analyse_modrm(sequence s, integer i)
     sequence modrm, sib
     sequence result
     atom disp = 0
@@ -361,7 +361,7 @@ function analize_modrm(sequence s, integer i)
 end function
 
 -- Попытка вынести анализирующий код в отдельную функцию
-function analize_mach(sequence s, integer i=1)
+function analyse_mach(sequence s, integer i=1)
     integer op, j = i
     sequence modrm, sib
     sequence result
@@ -375,7 +375,7 @@ function analize_mach(sequence s, integer i=1)
     if and_bits(op, #FE) = MOV_ACC_MEM then
         result &= {bytes_to_int(s[i..i+3]), i+4}
     elsif and_bits(op, #FC) = MOV_RM_REG or op = LEA then
-        result &= analize_modrm(s, i)
+        result &= analyse_modrm(s, i)
     else
         return -1
     end if
