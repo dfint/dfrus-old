@@ -215,11 +215,13 @@ function fix_len(atom fn, atom off, integer oldlen, integer len)
             if r = 1 then
                 move_to_reg = find(MOV_REG_RM, aft)
                 modrm = triads(aft[move_to_reg+1])
+                integer size = 6 -- размер инструкции = 6 байт
                 if modrm[1]!=0 and modrm[3]!=5 then -- проверка байта MOD R/M
                     move_to_reg = find(MOV_ACC_MEM, aft)
+                    size = 5 -- размер инструкции = 5 байт
                 end if
                 
-                move_to_mem = find_from(MOV_RM_REG, aft, move_to_reg+1)
+                move_to_mem = find_from(MOV_RM_REG, aft, move_to_reg+size) -- +размер инструкции копирования
                 if move_to_mem = 0 then
                     return 0
                 end if
@@ -237,7 +239,7 @@ function fix_len(atom fn, atom off, integer oldlen, integer len)
                 end if
             else
                 move_to_reg = find(PREFIX_OPERAND_SIZE, aft)
-                move_to_mem = find_from(PREFIX_OPERAND_SIZE, aft, move_to_reg+1)
+                move_to_mem = find_from(PREFIX_OPERAND_SIZE, aft, move_to_reg+6) -- + минимальный размер инструкции копирования из памяти
                 
                 if move_to_reg > 0 and move_to_mem > 0 then
                     fpoke(fn, next+move_to_reg-1, NOP) -- Увеличение размера операнда с word до dword (заменой префикса изменения размера операнда на NOP)
