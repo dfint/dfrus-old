@@ -295,35 +295,29 @@ function check_sign_bit(atom x, integer w)
     return x
 end function
 
--- Обработать байт sib и непосредственный операнд
-function process_operands(sequence s, integer i, sequence modrm)
-    sequence sib
+-- Функция по данным, полученным из analyse_modrm(), определяет место назначения
+function process_operands(sequence x)
+    sequence modrm = x[1], sib
     integer basereg, disp -- текущие базовый регистр и смещение
     
     -- Узнаем базовый регистр
     if modrm[3] != 4 then -- без байта SIB (Scale/Index/Base)
         basereg = modrm[3]
-    else -- используется байт SIB
-        sib = triads(s[i]) -- разбить байт SIB на отдельные поля
+    else  -- используется байт SIB
+        sib = x[2]
         if sib[1] != 0 or sib[2] != 4 then -- масштаб != 2 pow 0 или указан индексный регистр
             return -1
         end if
         basereg = sib[3]
-        i += 1 -- SIB 1 байт
     end if
     
-    -- Узнаем смещение
     if modrm[1] = 0 then -- без смещения
         disp = 0
-    elsif modrm[1] = 1 then -- однобайтовое смещение
-        disp = check_sign_bit(s[i], 8)
-        i += 1 -- смещение 1 байт
-    else -- четырехбайтовое смещение
-        disp = check_sign_bit(bytes_to_int(s[i..i+3]), 32)
-        i += 4 -- смещение 4 байта
+    else
+        disp = x[$-1]
     end if
     
-    return {basereg, disp, i}
+    return {basereg, disp, x[$]} -- x[$] возвращается для совместимости
 end function
 
 function analyse_modrm(sequence s, integer i)
@@ -404,7 +398,6 @@ function get_length(sequence s, integer len)
         
         op = s[i]
         i += 1 -- инструкция 1 байт
-        
         if and_bits(op, #FE)=MOV_ACC_MEM then -- в аккумулятор кладутся данные с указаного адреса
             if reg[AX+1] > 0 then
                 return -1 -- содержимое аккумулятора не было скопировано по месту назначения
@@ -416,21 +409,22 @@ function get_length(sequence s, integer len)
             
             reg[AX+1] = size -- в аккумулятор положили данные размером size
             deleted &= i -- добавить смещение ссылки в список удаляемых релокаций
-            i += 4 -- непосредственный операнд 4 байта
+            i += 4
         elsif and_bits(op, #FC)=MOV_RM_REG then
+            x = analyse_modrm(s,i)
+            
             if not and_bits(op,1) then
                 size = 1 -- флаг размера сброшен, значит копируется 1 байт
             end if
             
-            -- Разбиваем байт MOD R/M на отдельные поля:
-            modrm = triads(s[i])
+            modrm = x[1]
             
             -- Допустимые регистры: eax/ax/al, ecx/cx/cl, edx/dx/dl
             if modrm[2] > DX then
                 return -2
             end if
             
-            i += 1 -- MOD R/M 1 байт
+            i += 1
             
             if and_bits(op, 2) then -- данные кладутся в регистр
                 -- данные берутся с указаного адреса и кладутся в один из регистов
@@ -441,7 +435,6 @@ function get_length(sequence s, integer len)
                     
                     reg[modrm[2]+1] = size
                     deleted &= i -- добавить смещение ссылки в список удаляемых релокаций
-                    i += 4 -- непосредственный операнд 4 байта
                 else
                     return -4
                 end if
@@ -453,11 +446,10 @@ function get_length(sequence s, integer len)
                 end if
                 reg[modrm[2]+1] = 0
                 
-                x = process_operands(s, i, modrm)
+                x = process_operands(x)
                 if atom(x) then
                     return -6
                 end if
-                i = x[3]
                 
                 -- Определяем место назначения по минимальному значению disp
                 if atom(dest) then
@@ -468,9 +460,10 @@ function get_length(sequence s, integer len)
                 
                 cur_len += size
             end if
+            i = x[$]
         elsif op = LEA then
-            -- Разбиваем байт MOD R/M на отдельные поля:
-            modrm = triads(s[i])
+            x = analyse_modrm(s,i)
+            modrm = x[1]
             if modrm[1] = 3 then
                 return -7 -- регистровая адресация в LEA недопустима
             end if
@@ -480,13 +473,10 @@ function get_length(sequence s, integer len)
                 reg[modrm[2]+1] = -1 -- пометить регистр как занятый
             end if
             
-            i += 1 -- MOD R/M 1 байт
-            
-            x = process_operands(s, i, modrm)
+            x = process_operands(x)
             if atom(x) then
                 return -8
             end if
-            i = x[3]
             
             -- Определяем место назначения по минимальному значению disp
             if atom(dest) then
@@ -496,6 +486,7 @@ function get_length(sequence s, integer len)
             end if
             
             lea = modrm[2] & x[1..2]
+            i = x[$]
         else
             return -9 -- все прочие инструкции
         end if
