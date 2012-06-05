@@ -7,7 +7,7 @@ include std/get.e
 include std/sequence.e
 include std/map.e
 
-with trace
+-- with trace
 include patcher.e
 include pe.e
 include disasm.e
@@ -218,7 +218,7 @@ for i = 1 to length(strings) do
             end if
             if long then -- Если строка длинная,
                 -- то исправить ссылку на строку в коде:
-                fix_off(fn, s[j], off_to_rva_ex(str_off, new_section)+image_base)
+                fpoke4(fn, s[j], off_to_rva_ex(str_off, new_section)+image_base)
             end if
         elsif long then -- Если не удалось исправить длину:
             -- Считываем 3 байта перед ссылкой для нахождения начала копирующего кода
