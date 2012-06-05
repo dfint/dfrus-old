@@ -263,45 +263,8 @@ function fix_len(atom fn, atom off, integer oldlen, integer len)
                 end if
                 i = x[$]
             end while
-            return 0
-            -- if r = 1 then
-                -- move_to_reg = find(MOV_REG_RM, aft)
-                -- modrm = triads(aft[move_to_reg+1])
-                -- integer size = 6 -- размер инструкции = 6 байт
-                -- if modrm[1]!=0 or modrm[3]!=5 then -- проверка байта MOD R/M
-                    -- move_to_reg = find(MOV_ACC_MEM, aft)
-                    -- size = 5 -- размер инструкции = 5 байт
-                -- end if
-                
-                -- move_to_mem = find_from(MOV_RM_REG, aft, move_to_reg+size) -- +размер инструкции копирования
-                -- if move_to_mem = 0 then
-                    -- return 0
-                -- end if
-                -- modrm = triads(aft[move_to_mem+1])
-                -- if modrm[1]=3 then -- проверка байта MOD R/M
-                    -- move_to_mem = -move_to_mem
-                -- end if
-                
-                -- if move_to_reg > 0 then
-                    -- opcode = aft[move_to_reg]
-                    -- fpoke(fn, next+move_to_reg-1, opcode+1) -- Увеличение размера операнда с byte до dword (установкой бита размера операнда)
-                    -- opcode = aft[move_to_mem]
-                    -- fpoke(fn, next+move_to_mem-1, opcode+1) -- Увеличение размера операнда с byte до dword
-                    -- return 1
-                -- end if
-            -- else
-                -- move_to_reg = find(PREFIX_OPERAND_SIZE, aft)
-                -- move_to_mem = find_from(PREFIX_OPERAND_SIZE, aft, move_to_reg+6) -- + минимальный размер инструкции копирования из памяти
-                
-                -- if move_to_reg > 0 and move_to_mem > 0 then
-                    -- fpoke(fn, next+move_to_reg-1, NOP) -- Увеличение размера операнда с word до dword (заменой префикса изменения размера операнда на NOP)
-                    -- fpoke(fn, next+move_to_mem-1, NOP) -- Увеличение размера операнда с word до dword
-                    -- return 1
-                -- end if
-            -- end if
-        else
-            return 0 -- Не удалось исправить длину, необходимо править код
         end if
+        return 0 -- Не удалось исправить длину, необходимо править код
     end if
     
     return -1 -- Считаем, что во всех остальных случаях исправление длины не требуется
