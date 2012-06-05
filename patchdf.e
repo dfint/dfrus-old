@@ -350,7 +350,7 @@ function analize_modrm(sequence s, integer i)
                 disp = check_sign_bit(s[i], 8)
                 i += 1
                 result &= disp
-            else
+            elsif modrm[1] = 2 then
                 disp = check_sign_bit(bytes_to_int(s[i..i+3]), 32)
                 i += 4
                 result &= disp
