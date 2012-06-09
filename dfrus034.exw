@@ -68,6 +68,7 @@ end if
 
 -----------------------------------------------------------------------------
 printf(1,"Copying \"%s\"\nTo \"%s\"... ", {df1,df2})
+
 if not copy_file(df1,df2,1) then
     puts(1,"Failed.\n")
     any_key()
@@ -76,13 +77,25 @@ else
     puts(1,"Success.\n")
 end if
 
-
 -----------------------------------------------------------------------------
 puts(1,"Finding cross-referencess...\n")
 
 fn = open_pe(df2)
+if fn < 0 then
+    puts(1,"Failed to open \"%s\"", {df2})
+    delete_file(df2)
+    any_key()
+    abort(1)
+end if
 
-pe_header = check_pe(fn) -- todo: проверка валидности
+pe_header = check_pe(fn)
+if pe_header < 0 then
+    puts(1,"Failed. \"%s\" is not an executable file.")
+    close(fn)
+    delete_file(df2)
+    any_key()
+    abort(1)
+end if
 
 constant
     image_base = fpeek4u(fn, pe_header+PE_IMAGE_BASE),
