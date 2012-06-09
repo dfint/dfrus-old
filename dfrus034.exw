@@ -82,7 +82,7 @@ puts(1,"Finding cross-referencess...\n")
 
 fn = open_pe(df2)
 if fn < 0 then
-    puts(1,"Failed to open \"%s\"", {df2})
+    printf(1,"Failed to open \"%s\"", {df2})
     delete_file(df2)
     any_key()
     abort(1)
@@ -90,7 +90,7 @@ end if
 
 pe_header = check_pe(fn)
 if pe_header < 0 then
-    puts(1,"Failed. \"%s\" is not an executable file.")
+    printf(1,"Failed. \"%s\" is not an executable file.")
     close(fn)
     delete_file(df2)
     any_key()
