@@ -54,16 +54,6 @@ else
 end if*/
 
 -----------------------------------------------------------------------------
-printf(1,"Copying \"%s\"\nTo \"%s\"... ", {df1,df2})
-if not copy_file(df1,df2,1) then
-    puts(1,"Failed.\n")
-    any_key()
-    abort(1)
-else
-    puts(1,"Success.\n")
-end if
-
------------------------------------------------------------------------------
 puts(1,"Loading translation file... ")
 
 constant trans_filename = "trans.txt"
@@ -76,9 +66,16 @@ else
     printf(1,"%d strings loaded.\n", map:size(trans))
 end if
 
-function second(sequence s)
-    return s[2]
-end function
+-----------------------------------------------------------------------------
+printf(1,"Copying \"%s\"\nTo \"%s\"... ", {df1,df2})
+if not copy_file(df1,df2,1) then
+    puts(1,"Failed.\n")
+    any_key()
+    abort(1)
+else
+    puts(1,"Success.\n")
+end if
+
 
 -----------------------------------------------------------------------------
 puts(1,"Finding cross-referencess...\n")
@@ -153,6 +150,10 @@ atom str_off = new_section[SECTION_POFFSET]
 
 -----------------------------------------------------------------------------
 puts(1,"Translating...\n")
+
+function second(sequence s)
+    return s[2]
+end function
 
 sequence s, pre, mach
 integer aligned = 0, k, l, delta, start, long, alen
