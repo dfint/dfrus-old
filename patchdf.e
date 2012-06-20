@@ -73,7 +73,7 @@ function load_trans_file_to_map(sequence fname)
             x[2] = match_replace("\\r", x[2], "\r")
             x[3] = match_replace("\\r", x[3], "\r")
             if has(trans,x[2]) and debug then
-                printf(2,"Warning: there already is \"%s\" key in the map.\n",x[2])
+                printf(1,"Warning: there already is <%s> key in the map.\n",{x[2]})
             end if
             put(trans,x[2],x[3])
         end if
