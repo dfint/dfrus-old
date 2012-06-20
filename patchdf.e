@@ -72,6 +72,9 @@ function load_trans_file_to_map(sequence fname)
         if length(x)>3 then
             x[2] = match_replace("\\r", x[2], "\r")
             x[3] = match_replace("\\r", x[3], "\r")
+            if has(trans,x[2]) and debug then
+                printf(2,"Warning: there already is \"%s\" key in the map.\n",x[2])
+            end if
             put(trans,x[2],x[3])
         end if
     end while
@@ -185,9 +188,8 @@ function fix_len(atom fn, atom off, integer oldlen, integer len)
                 if disp=oldlen then
                     fpoke(fn, off-2, len)
                     return 1
-                elsif and_bits(pre[$-2],#07) != ESP then -- не адрес локальной переменной
-                    -- ? and_bits(pre[$-2],#07) & disp & off
-                    fpoke(fn, off-2, len-oldlen+disp) -- Экспериментально, нужно тестирование !!!
+                elsif and_bits(pre[$-2],#07) != ESP then -- lea edi, [reg+(len-содержимое_регистра)]
+                    fpoke(fn, off-2, len-oldlen+disp)
                     return 1
                 end if
             end if
@@ -203,8 +205,6 @@ function fix_len(atom fn, atom off, integer oldlen, integer len)
             elsif len > oldlen then
                 return -2 -- Не удалось исправить, хотя скорее всего нужно
             end if
-        -- else
-            -- ? reg & off
         end if
         return -1 -- ? в остальных случаях исправлять длину не нужно ?
     elsif pre[$] = MOV_ACC_MEM+1 or pre[$-1] = MOV_REG_RM+1 then -- mov eax, [] или mov reg, []
@@ -373,7 +373,7 @@ function analyse_mach(sequence s, integer i=1)
     else
         return -1
     end if
-    return result -- {{операция},{modrm},{sib},непосредственный операнд}
+    return result -- {{операция}, {modrm}, {sib}, непосредственный операнд, индекс следующей инструкции}
 end function
 
 -- Определить длину (в байтах) инструкций, копирующих строку, также нужно определить куда копируется строка
@@ -383,7 +383,7 @@ function get_length(sequence s, integer len)
     integer op
     integer size -- operand size
     sequence reg = {0,0,0} -- регистры eax/ax/al, ecx/cx/cl, edx/dx/dl
-    sequence modrm, sib
+    sequence modrm
     sequence deleted = {}
     object dest = -1 -- {регистр, смещение} -- место назначения
     object x
