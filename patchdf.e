@@ -121,7 +121,6 @@ end function
 public
 function get_cross_references_to_map(atom fn, sequence relocs, sequence sections, atom image_base)
     map xrefs = new()
-    atom reloc
     for i = 1 to length(relocs) do
         -- ѕолучаем смещение объекта, на который указывает перемещаемый элемент
         -- превращаем адрес в смещение и читаем что по этому смещению находитс€:
