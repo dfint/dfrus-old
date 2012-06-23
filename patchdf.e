@@ -84,7 +84,7 @@ end function
 constant code=1, rdata = 2, data = 3
 public
 function get_cross_references(atom fn, sequence relocs, sequence sections, atom image_base)
-    atom ref, obj
+    atom obj
     sequence objs = {}, xrefs = {}
     integer k
 
@@ -120,6 +120,7 @@ end function
 
 public
 function get_cross_references_to_map(atom fn, sequence relocs, sequence sections, atom image_base)
+    atom obj
     map xrefs = new()
     for i = 1 to length(relocs) do
         -- Получаем смещение объекта, на который указывает перемещаемый элемент
@@ -570,7 +571,6 @@ public
 function extract_strings(atom fn, sequence xref_table)
     sequence
         objs  = xref_table[1],
-        xrefs = xref_table[2],
         strings = {}
     object buf
     integer len
@@ -587,6 +587,44 @@ function extract_strings(atom fn, sequence xref_table)
             return -1
         end if
         -- проверяем, является ли данный объект строкой:
+        len = -1
+        integer letters = 0
+        for j = 1 to length(buf) do
+            if buf[j] = 0 then
+                len = j-1
+                exit
+            elsif not allowed(buf[j]) then
+                exit
+            elsif letter(buf[j]) then
+                letters += 1
+            end if
+        end for
+        if len>0 and letters>0 then
+            strings = append(strings,{objs[i],buf[1..len]})
+        end if
+    end for
+    return strings
+end function
+
+public
+function extract_strings_map(atom fn, map xrefs)
+    sequence
+        objs = keys(xrefs,1),
+        strings = {}
+    object buf
+    integer len
+    
+    for i = 1 to length(objs) do
+        -- исключить ссылки на середины строк:
+        if length(strings)>0 and objs[i]<=strings[$][1]+len then
+            continue
+        end if
+        -- считываем блок данных:
+        seek(fn, objs[i])
+        buf = get_bytes(fn, blocksize)
+        if atom(buf) then
+            return -1
+        end if
         len = -1
         integer letters = 0
         for j = 1 to length(buf) do
