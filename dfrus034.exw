@@ -54,7 +54,7 @@ else
 end if*/
 
 -----------------------------------------------------------------------------
-puts(1,"Loading translation file... ")
+puts(1,"Loading translation file...\n")
 
 constant trans_filename = "trans.txt"
 object trans = load_trans_file_to_map(trans_filename)
@@ -67,7 +67,7 @@ else
 end if
 
 -----------------------------------------------------------------------------
-printf(1,"Copying \"%s\"\nTo \"%s\"... ", {df1,df2})
+printf(1,"Copying \"%s\"\nTo \"%s\"...\n", {df1,df2})
 
 if not copy_file(df1,df2,1) then
     puts(1,"Failed.\n")
@@ -171,7 +171,7 @@ end function
 sequence s, pre, mach
 integer aligned = 0, k, l, delta, start, long, alen
 object x, translation
-sequence strings = extract_strings(fn, xref_table)
+sequence strings = extract_strings(fn, objs)
 if debug then
     printf(1,"%d strings extracted.\n", length(strings))
     if length(cmd)>=5 then

@@ -568,10 +568,8 @@ function letter(integer i)
 end function
 
 public
-function extract_strings(atom fn, sequence xref_table)
-    sequence
-        objs  = xref_table[1],
-        strings = {}
+function extract_strings(atom fn, sequence objs)
+    sequence strings = {}
     object buf
     integer len
     
