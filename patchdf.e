@@ -118,6 +118,30 @@ function get_cross_references(atom fn, sequence relocs, sequence sections, atom 
     return {objs, xrefs}
 end function
 
+public
+function get_cross_references_to_map(atom fn, sequence relocs, sequence sections, atom image_base)
+    map xrefs = new()
+    atom reloc
+    for i = 1 to length(relocs) do
+        -- Получаем смещение объекта, на который указывает перемещаемый элемент
+        -- превращаем адрес в смещение и читаем что по этому смещению находится:
+        relocs[i] -= sections[code][SECTION_RVA]
+        -- Ссылка должна находиться в секции кода:
+        if relocs[i] < 0 or relocs[i]>=sections[code][SECTION_VSIZE] then
+            continue
+        end if
+        relocs[i] += sections[code][SECTION_POFFSET]
+        -- Считываем адрес объекта и преобразуем его в смещение от начала файла:
+        obj = rva_to_off(fpeek4u(fn, relocs[i]) - image_base, sections)
+        -- Проверяем, находится ли адрес в секциях .rdata или .data:
+        if obj >= sections[rdata][SECTION_POFFSET] and obj < sections[data][SECTION_POFFSET]+sections[data][SECTION_PSIZE] then
+            -- Добавляем смещение объекта в хэш-таблицу
+            put(xrefs,obj,relocs[i],APPEND)
+        end if
+    end for
+    return xrefs
+end function
+
 -- Функция находит начало кода, копирующего данную строку
 public
 function get_start(sequence pre)
