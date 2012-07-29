@@ -216,6 +216,10 @@ function fix_len(atom fn, atom off, integer oldlen, integer len)
                     fpoke(fn, off-2, len-oldlen+disp)
                     return 1
                 end if
+            elsif length(aft)>0 and aft[1] = MOV_REG_RM+1 and and_bits(aft[2],#F8) = #C0+ECX*#8 -- mov ecx, reg
+                    and aft[3] = PUSH_IMM8 and aft[4] = oldlen then -- push len
+                fpoke(fn,next+3,len)
+                return 1
             end if
         elsif reg = ESI then -- mov esi, offset str
             if pre[$-5] = MOV_REG_IMM + 8 + ECX and
