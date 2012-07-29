@@ -33,8 +33,8 @@ constant df2 = path & "Dwarf Fortress Rus.exe"
 atom fn, pe_header
 
 -----------------------------------------------------------------------------
-/*puts(1,"Checking timedate stamp... ")
-constant DF03125SDL_stamp = #4D90764F
+puts(1,"Checking timedate stamp... ")
+constant DF_0_34_01_SDL_stamp = #4F391A33 -- Value got from http://dwarffortresswiki.org/index.php/DF2012:Memory_hacking
 fn = open_pe(df1)
 if fn < 0 then
     printf(1,"\nUnable to open \"%s\"\n",{df1})
@@ -45,13 +45,13 @@ end if
 pe_header = check_pe(fn)
 constant timedate = fpeek4u(fn, pe_header+PE_TIMEDATE_STAMP)
 close(fn)
-if timedate != DF03125SDL_stamp then
-    puts(1,"\nWrong timedate stamp. The patcher works with DF 0.31.25 SDL only.\n")
+if timedate < DF_0_34_01_SDL_stamp then
+    puts(1,"\nWrong timedate stamp. The patcher works with DF 0.34.1 SDL and later versions.\n")
     any_key()
     abort(1)
 else
     puts(1,"OK\n")
-end if*/
+end if
 
 -----------------------------------------------------------------------------
 puts(1,"Loading translation file...\n")
