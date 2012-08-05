@@ -22,8 +22,10 @@ function copy_tree(sequence src, sequence dest, sequence wildcard = "*", integer
     return walk_dir(src, {routine_id("walker"), {src, dest, wildcard, overwrite}}, 1)
 end function
 
-constant orig = "raw/objects"
-constant backup = orig & ".bak"
+constant
+    orig = "raw/objects",
+    backup = orig & ".bak",
+    diffs = "diffs"
 
 -- Если ключ запуска -r, то восстановить равки из бэкапа
 
@@ -39,6 +41,18 @@ else
 end if
 
 -- Пропатчить файлы в папке raw/objects
+function walk_and_patch(sequence path_name, sequence item, sequence user_data)
+    sequence
+        src = user_data[1],
+        dest = user_data[2] & '/' & path_name[length(src)+1..$]
+    if equal(fileext(item[D_NAME]), "diff") then
+        system("patch " & dest & '/' & filebase(item[D_NAME]) & ".txt " & path_name & '/' & item[D_NAME], 0)
+    end if
+    return 0
+end function
+
+walk_dir(diffs, {routine_id("walk_and_patch"), {diffs, orig}}, 1)
+
 -- Скопировать файлы из папки raw/objects в папки data/save/регион/raw/objects
 
 any_key()
