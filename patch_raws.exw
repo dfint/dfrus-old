@@ -1,9 +1,44 @@
 -- Утилита для исправления raw-файлов
+include std/console.e
+include std/wildcard.e
 include std/filesys.e
 
--- Если ключ запуска -r, то восстановить равки из бэк-апа
+function walker(sequence path_name, sequence item, sequence user_data)
+    sequence
+        src = user_data[1],
+        dest = user_data[2] & '/' & path_name[length(src)+1..$],
+        wildcard = user_data[3]
+    integer overwrite = user_data[4]
+    if is_match(wildcard, item[D_NAME]) then
+        if atom(dir(dest)) then
+            create_directory(dest)
+        end if
+        copy_file(path_name & '/' & item[D_NAME], dest & '/' & path_name[length(orig)+1..$] & '/' & item[D_NAME], overwrite)
+    end if
+    return 0
+end function
+
+function copy_tree(sequence src, sequence dest, sequence wildcard = "*", integer overwrite = 0)
+    return walk_dir(src, {routine_id("walker"), {src, dest, wildcard, overwrite}}, 1)
+end function
+
+constant orig = "raw/objects"
+constant backup = orig & ".bak"
+
+-- Если ключ запуска -r, то восстановить равки из бэкапа
 
 -- Проверить наличие папки raw/objects.bak
--- Забэкапить папку raw/objects
+if 1 or atom(dir(backup)) then
+    -- Забэкапить папку raw/objects
+    copy_tree(orig, backup, "*.txt", 0)
+    puts(1,"Raw files backuped.\n")
+else
+    -- Восстановить файлы из бэкапа
+    copy_tree(backup, orig, "*.txt", 1)
+    puts(1,"Raw files restored from backup.\n")
+end if
+
 -- Пропатчить файлы в папке raw/objects
 -- Скопировать файлы из папки raw/objects в папки data/save/регион/raw/objects
+
+any_key()
