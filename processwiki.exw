@@ -1,17 +1,14 @@
--- Утилита для обработки файлов, скачанных с wiki, для получения файла trans.txt
-
-include std/get.e
+-- Утилита для удаления текста, находящегося вне тега <pre></pre>
 include std/search.e
-include std/sequence.e
+include std/text.e
 
 constant lookup_table = {
-    {"quot","lt","gt","amp"},
-    {"\"","<",">","&"}
+    {"quot","lt","gt","amp","#160"},
+    {"\"","<",">","&"," "}
 }
 
 function convert_special_symbols(sequence s)
-    integer from,i,j
-    from = 1
+    integer from=1, i, j
     while 1 do
         i = find('&',s,from)
         if i=0 then
@@ -30,28 +27,45 @@ function convert_special_symbols(sequence s)
     return s
 end function
 
-function fst(sequence s)
-    return s[1]
-end function
-
-atom fn,fnout
-object line,x
-
-fnout = 1
-fn = 0
+integer on = 0
+integer r = 0
 while 1 do
-    line = gets(fn)
+    object line = gets(0)
     if atom(line) then
         exit
     end if
-    x = split(line, '|')
-    if length(x)>=3 then
-        if fst(value('#'&x[1])) != GET_SUCCESS then
-            x[1] = ""
+    
+    line = convert_special_symbols(line)
+    
+    if not on then
+        integer pre = match("<pre>",line)
+        if pre then
+            on = 1
+            line = line[pre+5..$]
+            if length(line)=1 then -- игнорировать строку, содержащую только <pre>
+                continue
+            end if
+        else
+            continue
         end if
-        x[2] = convert_special_symbols(x[2])
-        x[3] = convert_special_symbols(x[3])
-        line = x[1] & '|' & x[2] & '|' & x[3] & "|\n"
-        puts(fnout,line)
+    elsif ends("</pre>\n",line) then
+        on = 0
+        line = line[1..$-7]
+        if length(line)=0 then -- игнорировать строку, содержащую только </pre>
+            continue
+        end if
     end if
+    
+    if r then
+        puts(1,'\n')
+    end if
+    
+    if line[$] = '\n' then
+        r = 1
+        line = line[1..$-1]
+    else
+        r = 0
+    end if
+    
+    puts(1,line)
 end while
