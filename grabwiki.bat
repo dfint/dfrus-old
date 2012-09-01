@@ -1,9 +1,22 @@
 @echo off
-del part*
 chcp 1251
 set path=c:\Program Files (x86)\GnuWin32\bin;%path%
-wget http://www.dfwk.ru/Служебная:Export/User:Insolor/translation/part1
-wget http://www.dfwk.ru/Служебная:Export/User:Insolor/translation/part2
-wget http://www.dfwk.ru/Служебная:Export/User:Insolor/translation/part3
-wget http://www.dfwk.ru/Служебная:Export/User:Insolor/translation/part4
-iconv -c -f utf-8 -t cp1251 part1 part2 part3 part4 | eui processwiki > trans.txt
+
+echo ===================================== Downloading trans.txt: =====================================
+echo Generation started: %date%, %time% > trans.txt
+wget -B http://www.dfwk.ru/User:Insolor/translation/ -i transparts.lst -O - | ^
+iconv -c -f utf-8 -t cp1251 | ^
+eui procraws >> trans.txt
+
+echo ==================================== Downloading speech files:====================================
+wget http://www.dfwk.ru/Служебная:Export/User:Insolor/translation/speech -O - | ^
+iconv -c -f utf-8 -t cp1251 | ^
+eui procspeech data\speech
+
+REM echo ===================================== Downloading raw files: =====================================
+REM for /f %%I in (flist) do (
+REM echo %%I.txt
+REM wget http://www.dfwk.ru/User:Insolor/translation/raw/%%I -q -O - | ^
+REM iconv -c -f utf-8 -t cp1251 | ^
+REM eui procraws > data\raw\objects\%%I.txt
+REM )
