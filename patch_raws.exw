@@ -14,7 +14,6 @@ function walker(sequence path_name, sequence item, sequence user_data)
             create_directory(dest)
         end if
         copy_file(path_name & '/' & item[D_NAME], dest & path_name[length(src)+1..$] & item[D_NAME], overwrite)
-        -- puts(1, path_name & '/' & item[D_NAME] & " " & dest & ' ' & path_name[length(src)+1..$] & ' ' & item[D_NAME] & '\n')
     end if
     return 0
 end function
@@ -26,7 +25,8 @@ end function
 constant
     orig = "raw/objects",
     backup = orig & ".bak",
-    diffs = "diffs"
+    diffs = "diffs",
+    save = "data/save"
 
 -- Если ключ запуска -r, то восстановить равки из бэкапа
 
@@ -56,13 +56,14 @@ end function
 walk_dir(diffs, {routine_id("walk_and_patch"), {diffs, orig}}, 1)
 
 -- Скопировать файлы из папки raw/objects в папки data/save/регион/raw/objects
-object saves = dir("data/save")
+object saves = dir(save)
+-- object saves = {{"current"},{"region1"},{"region2"},{"region3"}}
 if atom(saves) then
     puts(1,"Save directory not found.\n")
 else
     for i = 1 to length(saves) do
-        if not equal(saves[i][D_NAME],"current") then
-            
+        if not equal(saves[i][D_NAME], "current") then
+            copy_tree(orig, save & '/' & saves[i][D_NAME] & orig, 1)
         end if
     end for
 end if

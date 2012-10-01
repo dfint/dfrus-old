@@ -7,7 +7,8 @@ include std/console.e
 include pe.e
 include patcher.e
 
-atom fn = open("d:\\GAMES\\DwarfFortress\\Dwarf Fortress.exe","rb")
+-- atom fn = open("d:\\Games\\df_34_09_win\\Dwarf Fortress.exe","rb")
+atom fn = open("d:\\Games\\df_34_11_win\\Dwarf Fortress Rus.exe","ub")
 constant pe_header = check_pe(fn)
 
 seek(fn,pe_header)
@@ -58,6 +59,57 @@ puts(1,"  Name      VirtualSize  VirtualAddress PhisicalSize PhisicalOffset     
 for i = 1 to length(sections) do
     printf(1,"%-8s      %08x      %08x      %08x      %08x      %08x\n",
         sections[i][1..5] & sections[i][$])
+end for
+
+constant pattern = {
+    #8B, #C6,       -- mov eax, esi
+    #80, #38, #61,  -- cmp byte [eax], 61h ; 'a'
+    #7C, #1A,       -- jl short +1Ah
+    #83, #F9, #10,  -- cmp ecx, 10h
+    #72, #04,       -- jb short +4
+    #8B, #06,       -- mov eax, [esi]
+    #EB, #02,       -- jmp short +2
+    #8B, #C6,       -- mov eax, esi
+    #80, #38, #7A,  -- cmp byte [eax], 7Ah ; 'z'
+    #7F, #0A,       -- jg short +0Ah
+    #83, #F9, #10,  -- cmp ecx, 10h
+    #72, #02,       -- jb short +2
+    #8B, #36,       -- mov esi, [esi]
+    #80, #06, #E0   -- add byte [esi], 0E0h
+}
+
+constant image_base = #400000
+constant blocksize = 1024
+
+include std/io.e
+
+seek(fn, sections[1][SECTION_POFFSET])
+object buf
+for i = 1 to floor((sections[1][SECTION_PSIZE]+blocksize-1)/blocksize) do
+    buf = get_bytes(fn,blocksize)
+    integer pos = where(fn)
+    if atom(buf) then
+        exit
+    end if
+    integer j = find(pattern[1],buf)
+    if j > 0 then
+        if j > blocksize-length(pattern) then
+            buf &= get_bytes(fn, length(pattern))
+            seek(fn,pos)
+        end if
+        while 1 do
+            j = match(pattern, buf, j)
+            if j=0 then
+                exit
+            end if
+            printf(1,"%x\n", image_base+sections[1][SECTION_RVA]+(i-1)*blocksize+j-1)
+            atom off = sections[1][SECTION_POFFSET]+(i-1)*blocksize+j-1
+            fpoke(fn,off+4,'à')
+            fpoke(fn,off+20,'ÿ')
+            seek(fn,pos)
+            j+=1
+        end while
+    end if
 end for
 
 close(fn)
