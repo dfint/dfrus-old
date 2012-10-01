@@ -5,6 +5,7 @@ include std/filesys.e
 include std/search.e
 include std/get.e
 include std/sequence.e
+include std/convert.e
 
 -- with trace
 include patcher.e
@@ -129,10 +130,11 @@ sequence new_section = {
     align(sections[$][SECTION_POFFSET] + sections[$][SECTION_PSIZE],
         file_alignment), -- Phisical Offset -- Выровнять под #200
     0,0,0,0, -- reserved
-    IMAGE_SCN_CNT_INITIALIZED_DATA + IMAGE_SCN_MEM_READ -- readable data
+    IMAGE_SCN_CNT_INITIALIZED_DATA + IMAGE_SCN_MEM_READ +
+        IMAGE_SCN_CNT_CODE + IMAGE_SCN_MEM_EXECUTE -- readable data + executable code
 }
 
-atom str_off = new_section[SECTION_POFFSET]
+atom off = new_section[SECTION_POFFSET]
 
 -----------------------------------------------------------------------------
 puts(1,"Translating...\n")
@@ -140,6 +142,7 @@ puts(1,"Translating...\n")
 sequence s, pre, mach
 integer aligned = 0, k, l, extra, delta, start, long
 object x
+atom new_reloc = -1
 
 for i = 1 to length(trans) do
     if equal(trans[i][2], trans[i][3]) then
@@ -182,9 +185,9 @@ for i = 1 to length(trans) do
             fpoke(fn, trans[i][1], trans[i][3] & 0)
         else
             -- Если строка длинная, то записать ее в специально отведенную для этого секцию:
-            str_off += aligned
+            off += aligned
             aligned = align(length(trans[i][3])+1)
-            fpoke(fn, str_off, pad_tail(trans[i][3], aligned, 0))
+            fpoke(fn, off, pad_tail(trans[i][3], aligned, 0))
         end if
         
         for j = 1 to length(s) do
@@ -192,7 +195,7 @@ for i = 1 to length(trans) do
             if fix_len(fn, s[j], length(trans[i][2]), length(trans[i][3])) then
                 if long then -- Если строка длинная,
                     -- то исправить ссылку на строку в коде:
-                    fix_off(fn, s[j], off_to_rva_ex(str_off, new_section)+image_base)
+                    fix_off(fn, s[j], off_to_rva_ex(off, new_section)+image_base)
                 end if
             else -- Если не удалось исправить длину:
                 -- Считываем 3 байта перед ссылкой для нахождения начала копирующего кода
@@ -204,26 +207,31 @@ for i = 1 to length(trans) do
                 
                 if sequence(x) then
                     -- Получаем машинный код, копирующий строку:
-                    mach = mach_memcpy(off_to_rva_ex(str_off, new_section)+image_base, x[2], length(trans[i][3])+1)
+                    mach = mach_memcpy(off_to_rva_ex(off, new_section)+image_base, x[2], length(trans[i][3])+1)
                     if sequence(x[4]) then
+                        -- Если в заменяемом коде была инструкция lea, то добавляем в конец нового кода
                         mach &= lea(x[4][1],x[4][2..3])
                     end if
-                    if length(mach) > x[1] then
-                        -- todo: записывать mach в новую секцию, а на месте записывать вызов этого кода.
-                        if debug then
-                            printf(1,"%x|%s|%s| <- %x (%x)\n",
-                                trans[i][1..3] & s[j] & ( off_to_rva_ex(s[j], sections[1])+image_base ) )
-                            printf(1, "Mach code is too long (%d against %d).\n",{length(mach),x[1]})
-                        end if
-                        continue -- полученный машинный код не уместился
+                    if length(mach) <= x[1] then
+                        mach = pad_tail(mach, x[1], NOP) -- добиваем освободившиеся байты пустыми командами
+                        fpoke(fn, start, mach) -- патчим код!
+                        -- Преобразуем смещение начала измененного кода в его относительный адрес:
+                        start = off_to_rva_ex(start, sections[1])
+                        x[3] += start-1 -- получаем адреса удаленных ссылок
+                        new_reloc = start+new_ref_off
+                    else
+                        -- Прописать сгенерированный код в новую секцию:
+                        off += aligned
+                        aligned = align(length(mach)+1)
+                        fpoke(fn, off, mach & RET_NEAR)
+                        -- На место старого кода вписать вызов нового кода:
+                        mach = CALL_NEAR & int_to_bytes(off_to_rva_ex(off, new_section)+image_base-off_to_rva_ex(start+5, sections[1]))
+                        mach = pad_tail(mach, x[1], NOP)
+                        fpoke(fn, start, mach)
+                        new_reloc = off+new_ref_off
                     end if
-                    mach = pad_tail(mach, x[1], NOP) -- добиваем освободившиеся байты пустыми командами
-                    fpoke(fn, start, mach) -- патчим код!
                     -- Исправляем битые релокации --
-                    -- Преобразуем смещение начала измененного кода в его относительный адрес:
-                    start = off_to_rva_ex(start, sections[1])
-                    x[3] += start-1 -- получаем адреса удаленных ссылок
-                    if modify_relocations(fn, sections, (-x[3]) & (start+new_ref_off)) != 0 and debug then
+                    if modify_relocations(fn, sections, (-x[3]) & new_reloc) != 0 and debug then
                         printf(1,"%x|%s|%s| <- %x (%x)\n",
                             trans[i][1..3] & s[j] & ( off_to_rva_ex(s[j], sections[1])+image_base ) )
                         puts(1, "Failed to fix relocations.\n")
@@ -237,25 +245,25 @@ for i = 1 to length(trans) do
         end for
     end if
 end for
-str_off+=aligned
+off+=aligned
 
 -----------------------------------------------------------------------------
 -- Физическое добавление новой секции
 
 -- Выровнять физический размер секции и файла под #200
-atom file_size = align(str_off, file_alignment)
+atom file_size = align(off, file_alignment)
 new_section[SECTION_PSIZE] = file_size - new_section[SECTION_POFFSET]
 
 -- Создавать новую секцию только при ненулевом ее размере:
 if new_section[SECTION_PSIZE] > 0 then
-    puts(1,"Adding new data section...\n")
+    puts(1,"Adding new section...\n")
     
     -- Выровнять размер файла:
     seek(fn,file_size-1)
     puts(fn,0)
 
     -- Виртуальный размер секции, выравнивать не нужно:
-    new_section[SECTION_VSIZE] = str_off - new_section[SECTION_POFFSET] 
+    new_section[SECTION_VSIZE] = off - new_section[SECTION_POFFSET] 
 
     -- Записать информацию о секции: 
     put_section_info(fn,

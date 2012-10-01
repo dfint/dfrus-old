@@ -5,8 +5,13 @@ include std/sequence.e
 include std/error.e
 include std/filesys.e
 
-constant path = "data\\speechru"
-if length(path)>0 and atom(dir(path)) then
+constant cmd = command_line()
+sequence path
+if length(cmd)>2 then
+    path = cmd[3]
+end if
+
+if object(path) and length(path)>0 and atom(dir(path)) then
     create_directory(path)
 end if
 
