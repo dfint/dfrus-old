@@ -1,0 +1,6 @@
+Инструкция по русификации DF 0.34.* :
+* Распаковать dfrus034.exe и trans.txt в папку с Dwarf Fortress.exe
+* Запустить dfrus034.exe. В папке должен появиться файл Dwarf Fortress Rus.exe
+* В файле \data\init\init.txt поменять [TRUETYPE:NO] на [TRUETYPE:YES] (чтобы каждый раз не нажимать F12)
+* По желанию можно поменять шрифт \data\art\font.ttf на более красивый
+* Теперь можно запускать Dwarf Fortress Rus.exe и наслаждаться косяками перевода и патча
