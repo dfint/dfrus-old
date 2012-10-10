@@ -207,7 +207,7 @@ function fix_len(atom fn, atom off, integer oldlen, integer len)
                     bytes_to_int(aft[2..5]) = oldlen then -- mov edi,len ; после
                 fpoke4(fn,next+1,len)
                 return 1
-            elsif pre[$-3]=LEA and and_bits(pre[$-2],#F8)=#40+EDI*#8 then -- lea edi, [reg+len]
+            elsif pre[$-3]=LEA and and_bits(pre[$-2],#F8) = glue_triads(1,EDI,0) then -- lea edi, [reg+len]
                 integer disp = check_sign_bit(pre[$-1],8)
                 if disp=oldlen then
                     fpoke(fn, off-2, len)
@@ -216,7 +216,7 @@ function fix_len(atom fn, atom off, integer oldlen, integer len)
                     fpoke(fn, off-2, len-oldlen+disp)
                     return 1
                 end if
-            elsif length(aft)>0 and aft[1] = MOV_REG_RM+1 and and_bits(aft[2],#F8) = #C0+ECX*#8 -- mov ecx, reg
+            elsif length(aft)>0 and aft[1] = MOV_REG_RM+1 and and_bits(aft[2],#F8) = glue_triads(3,ECX,0) -- mov ecx, reg
                     and aft[3] = PUSH_IMM8 and aft[4] = oldlen then -- push len
                 fpoke(fn,next+3,len)
                 return 1
@@ -227,7 +227,7 @@ function fix_len(atom fn, atom off, integer oldlen, integer len)
                 r = remainder(oldlen+1,4)
                 fpoke4(fn, off-5, floor((len+1-r+3)/4)) -- с учетом инструкций, копирующих остаток строки
                 return 1
-            elsif pre[$-3] = LEA and and_bits(pre[$-2],#F8)=#40+ECX*#8 and pre[$-1]=floor((oldlen+1)/4) then
+            elsif pre[$-3] = LEA and and_bits(pre[$-2],#F8) = glue_triads(1,ECX,0) and pre[$-1]=floor((oldlen+1)/4) then
                 r = remainder(oldlen+1,4)
                 fpoke(fn, off-2, floor((len+1-r+3)/4))
             elsif len > oldlen then
@@ -309,11 +309,6 @@ procedure fix_off(atom fn, atom ref, atom new_rva)
         -- stub
     end if
 end procedure
-
--- –азбить байт на триады
-function triads(integer x)
-    return and_bits(floor(x/{#40,#08,#1}), #7)
-end function
 
 -- ¬ соответствии с битом знака изменить знак числа
 function check_sign_bit(atom x, integer w)
@@ -531,7 +526,7 @@ function mach_memcpy(integer src, sequence dest, integer count) -- (адрес, {реги
     -- —охранение регистров общего назначени€ в стеке
     mach &= PUSHAD
     
-    mach &= (XOR_RM_REG+1) & (#C0+#08*ECX+ECX) & -- XOR ECX, ECX
+    mach &= (XOR_RM_REG+1) & glue_triads(3,ECX,ECX) & -- XOR ECX, ECX
         (MOV_REG_IMM+CL) & (floor(count+3)/4) -- MOV CL, IMM8
     
     -- ≈сли адрес места назначени€ еще не находитс€ в регистре edi, кладем его туда:
@@ -541,7 +536,7 @@ function mach_memcpy(integer src, sequence dest, integer count) -- (адрес, {реги
             mach &= lea(EDI, dest)
         else
             -- MOV EDI, reg
-            mach &= (MOV_RM_REG+1) & (#C0+#08*dest[1]+EDI)
+            mach &= (MOV_RM_REG+1) & glue_triads(3,dest[1],EDI)
         end if
     end if
     
@@ -557,6 +552,7 @@ function mach_memcpy(integer src, sequence dest, integer count) -- (адрес, {реги
     return mach
 end function
 
+-- »звлечение строк из исполн€емого файла
 constant blocksize = 1024
 
 function forbidden(integer i)
