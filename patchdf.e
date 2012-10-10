@@ -142,6 +142,8 @@ function get_cross_references_to_map(atom fn, sequence relocs, sequence sections
     return xrefs
 end function
 
+-- Подпрограммы для работы с машинным кодом
+
 -- Функция находит начало кода, копирующего данную строку
 public
 function get_start(sequence pre)
@@ -562,6 +564,7 @@ function mach_memcpy(integer src, sequence dest, integer count) -- (адрес, {реги
 end function
 
 -- Извлечение строк из исполняемого файла
+
 constant blocksize = 1024
 
 function forbidden(integer i)
