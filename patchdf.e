@@ -528,10 +528,10 @@ function get_length(sequence s, integer len)
     return {i-1, dest, deleted, lea} -- {длина кода, место назначения, смещения ссылок в память, инструкция lea}
 end function
 
-public integer new_ref_off -- смещение ссылки на источник в генерируемом машинном коде
 -- Функция возвращает машинный код, копирующий требуемое количество байт в нужное место
 public
 function mach_memcpy(integer src, sequence dest, integer count) -- (адрес, {регистр, смещение}, количество байт)
+    integer new_ref_off -- смещение ссылки на источник в генерируемом машинном коде
     sequence mach = {}
     
     -- Сохранение регистров общего назначения в стеке
@@ -560,7 +560,7 @@ function mach_memcpy(integer src, sequence dest, integer count) -- (адрес, {реги
     -- Восстановление регистров общего назначения из стека
     mach &= POPAD
     
-    return mach
+    return mach & new_ref_off
 end function
 
 -- Извлечение строк из исполняемого файла
