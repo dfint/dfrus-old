@@ -93,12 +93,8 @@ public constant MOVSB = #A4, MOVSD = #A5, MOVSW = PREFIX_OPERAND_SIZE & MOVSD
 
 -- public constant MOD_MASK = #C0
 
-function mod_reg_rm(integer mod, integer reg, integer rm)
-    return mod*#40 + reg*#08 + rm
-end function
-
-function scale_index_base(integer scale, integer ireg, integer breg)
-    return scale*#40 + ireg*#08 + breg
+function glue_triads(integer a, integer b, integer c)
+    return a*#40 + b*#08 + c
 end function
 
 include std/convert.e
@@ -117,10 +113,10 @@ function lea(integer dest, sequence src)
     end if
     
     if src[1] = ESP then
-        mach &= mod_reg_rm(md,dest,4) -- байт mod r/m
-        mach &= scale_index_base(0,4,src[1]) -- байт sib
+        mach &= glue_triads(md,dest,4) -- байт mod r/m
+        mach &= glue_triads(0,4,src[1]) -- байт sib
     else
-        mach &= mod_reg_rm(md,dest,src[1]) -- байт mod r/m
+        mach &= glue_triads(md,dest,src[1]) -- байт mod r/m
     end if
     
     if md = 1 then
