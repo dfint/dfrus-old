@@ -180,6 +180,9 @@ function fix_len(atom fn, atom off, integer oldlen, integer len)
     integer move_to_reg, move_to_mem, opcode
     sequence modrm
     
+    -- По поводу нижеследующего ифа: можно проверять, не идет ли по безусловному переходу инструкция,
+    -- указывающая длину строки, и если да, то переход на код, прописывающий нужную длину, а потом переход
+    -- на код идущий после кода указывающего старую длину
     if aft[1] = JMP_SHORT or
         aft[1] = JMP_NEAR or
             aft[1] = CALL_NEAR or
@@ -343,6 +346,8 @@ function process_operands(sequence x)
     return {basereg, disp, x[$]} -- x[$] возвращается для совместимости
 end function
 
+-- Анализ байта mod r/m и выбор соответствующего типа адресации
+-- На входе: набор байт машинного кода. Первый байт - mod r/m
 function analyse_modrm(sequence s, integer i)
     sequence modrm, sib
     sequence result
@@ -374,10 +379,12 @@ function analyse_modrm(sequence s, integer i)
             end if
         end if
     end if
-    return result & i
+    return result & i -- {{триады байта modrm}, [{триады байта sib},] смещение, i}
 end function
 
 -- Попытка вынести анализирующий код в отдельную функцию
+-- На входе: набор байт машинного кода
+-- На выходе: см. последний return.
 function analyse_mach(sequence s, integer i=1)
     integer op, j = i
     sequence modrm, sib
@@ -400,6 +407,8 @@ function analyse_mach(sequence s, integer i=1)
 end function
 
 -- Определить длину (в байтах) инструкций, копирующих строку, также нужно определить куда копируется строка
+-- На входе: набор байт машинного кода
+-- На выходе: см. последний return.
 public
 function get_length(sequence s, integer len)
     integer i = 1, cur_len = 0 -- текущее количество скопированых байт
