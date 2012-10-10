@@ -93,6 +93,14 @@ public constant MOVSB = #A4, MOVSD = #A5, MOVSW = PREFIX_OPERAND_SIZE & MOVSD
 
 -- public constant MOD_MASK = #C0
 
+-- Разбить байт на триады
+public
+function triads(integer x)
+    return and_bits(floor(x/{#40,#08,#1}), #7)
+end function
+
+-- Склеить 3 триады
+public
 function glue_triads(integer a, integer b, integer c)
     return a*#40 + b*#08 + c
 end function
