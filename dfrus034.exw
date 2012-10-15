@@ -33,7 +33,6 @@ constant df2 = path & "Dwarf Fortress Rus.exe"
 atom fn, pe_header
 
 -----------------------------------------------------------------------------
-puts(1,"Checking timedate stamp... ")
 constant DF_0_34_01_SDL_stamp = #4F391A33 -- Value got from http://dwarffortresswiki.org/index.php/DF2012:Memory_hacking
 fn = open_pe(df1)
 if fn < 0 then
@@ -42,6 +41,7 @@ if fn < 0 then
     abort(1)
 end if
 
+puts(1,"Checking timedate stamp... ")
 pe_header = check_pe(fn)
 constant timedate = fpeek4u(fn, pe_header+PE_TIMEDATE_STAMP)
 close(fn)
@@ -245,6 +245,8 @@ for i = 1 to length(strings) do
             if sequence(x) then
                 -- Получаем машинный код, копирующий строку:
                 mach = mach_memcpy(off_to_rva_ex(str_off, new_section)+image_base, x[2], length(translation)+1)
+                integer new_ref_off = mach[$]
+                mach = mach[1..$-1]
                 -- Добавляем в машинный код затираемое lea, т.к. значение может использоваться ниже по коду:
                 if sequence(x[4]) then
                     mach &= lea(x[4][1],x[4][2..3])
@@ -258,8 +260,6 @@ for i = 1 to length(strings) do
                     continue -- полученный машинный код не уместился
                 end if
                 mach = pad_tail(mach, x[1], NOP) -- добиваем освободившиеся байты пустыми командами
-                integer new_ref_off = mach[$]
-                mach = mach[1..$-1]
                 fpoke(fn, start, mach) -- патчим код!
                 -- Исправляем битые релокации --
                 -- Преобразуем смещение начала измененного кода в его относительный адрес:
