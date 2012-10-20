@@ -6,6 +6,7 @@ include std/search.e
 include std/get.e
 include std/sequence.e
 include std/map.e
+include std/convert.e
 
 -- with trace
 include patcher.e
@@ -160,6 +161,7 @@ sequence new_section = {
 }
 
 atom new_sect_off = new_section[SECTION_POFFSET] -- —мещение в новой секции
+integer aligned = 0
 
 -----------------------------------------------------------------------------
 puts(1,"Translating...\n")
@@ -179,11 +181,8 @@ if debug then
     end if
 end if
 
-integer aligned = 0
-object x, translation
-
 for i = 1 to length(strings) do
-    translation = map:get(trans, strings[i][2])
+    object translation = map:get(trans, strings[i][2])
     if atom(translation) then
         -- if debug then
             -- printf(1,"Translation not found for \"%s\".\n", {strings[i][2]})
@@ -214,9 +213,9 @@ for i = 1 to length(strings) do
     if not long then
         -- ≈сли строка достаточно коротка€, то записать ее поверх старой:
         fpoke(fn, strings[i][1], pad_tail(translation & 0, aligned_len, 0)) -- назадействованные байты заполнить нул€ми
+        aligned = 0
     else
         -- ≈сли строка длинна€, то записать ее в специально отведенную дл€ этого секцию:
-        new_sect_off += aligned
         aligned = align(length(translation)+1)
         fpoke(fn, new_sect_off, pad_tail(translation, aligned, 0))
     end if
@@ -240,7 +239,7 @@ for i = 1 to length(strings) do
             -- Ќаходим начало копирующего кода:
             integer start = s[j]-get_start(pre)
             -- ѕолучаем длину кода, копирующего строку:
-            x = get_length( fpeek(fn, {start, 100}), length(strings[i][2])+1)
+            object x = get_length( fpeek(fn, {start, 100}), length(strings[i][2])+1)
             
             if sequence(x) then
                 -- ѕолучаем машинный код, копирующий строку:
@@ -280,8 +279,8 @@ for i = 1 to length(strings) do
             end if
         end if
     end for
+    new_sect_off += aligned
 end for
-new_sect_off+=aligned
 
 -----------------------------------------------------------------------------
 -- ‘изическое добавление новой секции
