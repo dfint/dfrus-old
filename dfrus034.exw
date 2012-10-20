@@ -251,6 +251,7 @@ for i = 1 to length(strings) do
                 if sequence(x[4]) then
                     mach &= lea(x[4][1],x[4][2..3])
                 end if
+                integer new_ref -- Адрес новой ссылки
                 if length(mach) > x[1] then
                     -- Полученный машинный код не умещается на первоначальное место
                     if debug then
@@ -265,9 +266,10 @@ for i = 1 to length(strings) do
                 end if
                 -- Исправляем битые релокации --
                 -- Преобразуем смещение начала измененного кода в его относительный адрес:
-                start = off_to_rva_ex(start, sections[1])
-                x[3] += start-1 -- получаем адреса удаленных ссылок
-                if modify_relocations(fn, sections, (-x[3]) & (start+new_ref_off)) != 0 and debug then
+                integer start_off = off_to_rva_ex(start, sections[1])
+                new_ref = start_off+new_ref_off
+                x[3] += start_off-1 -- получаем адреса удаленных ссылок
+                if modify_relocations(fn, sections, (-x[3]) & new_ref) != 0 and debug then
                 printf(1,"|%s|%s| <- %x (%x)\n",
                     {strings[i][2], translation} & s[j] & ( off_to_rva_ex(s[j], sections[1])+image_base ) )
                     puts(1, "Failed to fix relocations.\n")
