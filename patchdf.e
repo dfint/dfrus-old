@@ -162,12 +162,6 @@ function get_start(sequence pre)
     return i
 end function
 
--- Округлить n до ближайшего числа, кратного edge, большего или равного n
-public
-function align(atom n, atom edge = 4)
-    return and_bits(n+edge-1, -edge)
-end function
-
 include disasm.e
 
 -- Функция исправления длины, прописанной в коде

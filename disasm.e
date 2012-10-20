@@ -134,3 +134,9 @@ function lea(integer dest, sequence src)
     end if
     return mach
 end function
+
+-- Округлить n до ближайшего числа, кратного edge, большего или равного n
+public
+function align(atom n, atom edge = 4)
+    return and_bits(n+edge-1, -edge)
+end function
