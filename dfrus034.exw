@@ -251,9 +251,18 @@ for i = 1 to length(strings) do
                 if sequence(x[4]) then
                     mach &= lea(x[4][1],x[4][2..3])
                 end if
+                integer start_rva = off_to_rva_ex(start, sections[1]) -- RVA начала измен€емого кода
                 integer new_ref -- јдрес новой ссылки
                 if length(mach) > x[1] then
                     -- ѕолученный машинный код не умещаетс€ на первоначальное место
+                    -- ѕрописываем его в отдельную секцию
+                    -- new_sect_off += aligned
+                    -- mach &= RET_NEAR -- ѕревращаем сгенерированный код в процедуру
+                    -- fpoke(fn, new_sect_off, mach)
+                    -- aligned = align(length(mach))
+                    -- -- ѕо первоначальному местоположению копирующего кода пропишем вызов процедуры
+                    -- mach = CALL_NEAR & int_to_bytes(new_ref_off-(start+5))
+                    -- new_ref = off_to_rva_ex(new_sect_off, new_section)+new_ref_off
                     if debug then
                         printf(1,"|%s|%s| <- %x (%x)\n",
                             {strings[i][2], translation} & s[j] & ( off_to_rva_ex(s[j], sections[1])+image_base ) )
@@ -261,18 +270,17 @@ for i = 1 to length(strings) do
                     end if
                     continue -- полученный машинный код не уместилс€
                 else
-                    mach = pad_tail(mach, x[1], NOP) -- добиваем освободившиес€ байты пустыми командами
-                    fpoke(fn, start, mach) -- патчим код!
+                    new_ref = start_rva+new_ref_off
                 end if
+                mach = pad_tail(mach, x[1], NOP) -- добиваем освободившиес€ байты пустыми командами
+                fpoke(fn, start, mach) -- патчим код!
                 -- »справл€ем битые релокации --
-                -- ѕреобразуем смещение начала измененного кода в его относительный адрес:
-                integer start_off = off_to_rva_ex(start, sections[1])
-                new_ref = start_off+new_ref_off
-                x[3] += start_off-1 -- получаем адреса удаленных ссылок
-                if modify_relocations(fn, sections, (-x[3]) & new_ref) != 0 and debug then
-                printf(1,"|%s|%s| <- %x (%x)\n",
-                    {strings[i][2], translation} & s[j] & ( off_to_rva_ex(s[j], sections[1])+image_base ) )
-                    puts(1, "Failed to fix relocations.\n")
+                x[3] += start_rva-1 -- получаем адреса удаленных ссылок
+                integer mod_reloc = modify_relocations(fn, sections, (-x[3]) & new_ref)
+                if mod_reloc != 0 and debug then
+                    printf(1,"|%s|%s| <- %x (%x)\n",
+                        {strings[i][2], translation} & s[j] & ( off_to_rva_ex(s[j], sections[1])+image_base ) )
+                    printf(1, "Failed to fix relocations (Error code %d).\n",mod_reloc)
                 end if
             elsif debug then
                 printf(1,"|%s|%s| <- %x (%x)\n",
