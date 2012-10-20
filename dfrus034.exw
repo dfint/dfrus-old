@@ -156,7 +156,7 @@ sequence new_section = {
     align(sections[$][SECTION_POFFSET] + sections[$][SECTION_PSIZE],
         file_alignment), -- Phisical Offset -- Выровнять под #200
     0,0,0,0, -- reserved
-    IMAGE_SCN_CNT_INITIALIZED_DATA + IMAGE_SCN_MEM_READ -- readable data
+    IMAGE_SCN_CNT_INITIALIZED_DATA + IMAGE_SCN_MEM_READ + IMAGE_SCN_MEM_EXECUTE -- readable code/data
 }
 
 atom new_sect_off = new_section[SECTION_POFFSET] -- Смещение в новой секции
