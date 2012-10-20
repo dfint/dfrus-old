@@ -159,7 +159,7 @@ sequence new_section = {
     IMAGE_SCN_CNT_INITIALIZED_DATA + IMAGE_SCN_MEM_READ -- readable data
 }
 
-atom str_off = new_section[SECTION_POFFSET]
+atom new_sect_off = new_section[SECTION_POFFSET] -- Смещение в новой секции
 
 -----------------------------------------------------------------------------
 puts(1,"Translating...\n")
@@ -216,23 +216,23 @@ for i = 1 to length(strings) do
         fpoke(fn, strings[i][1], pad_tail(translation & 0, alen, 0)) -- назадействованные байты заполнить нулями
     else
         -- Если строка длинная, то записать ее в специально отведенную для этого секцию:
-        str_off += aligned
+        new_sect_off += aligned
         aligned = align(length(translation)+1)
-        fpoke(fn, str_off, pad_tail(translation, aligned, 0))
+        fpoke(fn, new_sect_off, pad_tail(translation, aligned, 0))
     end if
     
+    -- Исправляем длину строк по каждой из ссылок на нее
     for j = 1 to length(s) do
         -- Исправить длину строки:
         integer fix = fix_len(fn, s[j], length(strings[i][2]), length(translation))
-        if fix != 0 then
-            if fix = -2 and debug then
+        if fix != 0 then -- Удалось исправить длину, или исправление не требуется
+            if fix = -2 and debug then -- не удалось исправить длину, но скорее всего нужно
                 printf(1,"|%s|%s| <- %x (%x)\n",
                     {strings[i][2], translation} & s[j] & ( off_to_rva_ex(s[j], sections[1])+image_base ) )
-                puts(1, "Failed to fix length.\n")
+                puts(1, "SUSPICIOUS: Failed to fix length.\n")
             end if
-            if long then -- Если строка длинная,
-                -- то исправить ссылку на строку в коде:
-                fpoke4(fn, s[j], off_to_rva_ex(str_off, new_section)+image_base)
+            if long then -- Если строка длинная, то исправить ссылку на строку в коде:
+                fpoke4(fn, s[j], off_to_rva_ex(new_sect_off, new_section)+image_base)
             end if
         elsif long then -- Если не удалось исправить длину:
             -- Считываем 3 байта перед ссылкой для нахождения начала копирующего кода
@@ -244,7 +244,7 @@ for i = 1 to length(strings) do
             
             if sequence(x) then
                 -- Получаем машинный код, копирующий строку:
-                mach = mach_memcpy(off_to_rva_ex(str_off, new_section)+image_base, x[2], length(translation)+1)
+                mach = mach_memcpy(off_to_rva_ex(new_sect_off, new_section)+image_base, x[2], length(translation)+1)
                 integer new_ref_off = mach[$]
                 mach = mach[1..$-1]
                 -- Добавляем в машинный код затираемое lea, т.к. значение может использоваться ниже по коду:
@@ -278,13 +278,13 @@ for i = 1 to length(strings) do
         end if
     end for
 end for
-str_off+=aligned
+new_sect_off+=aligned
 
 -----------------------------------------------------------------------------
 -- Физическое добавление новой секции
 
 -- Выровнять физический размер секции и файла под #200
-atom file_size = align(str_off, file_alignment)
+atom file_size = align(new_sect_off, file_alignment)
 new_section[SECTION_PSIZE] = file_size - new_section[SECTION_POFFSET]
 
 -- Создавать новую секцию только при ненулевом ее размере:
@@ -296,7 +296,7 @@ if new_section[SECTION_PSIZE] > 0 then
     puts(fn,0)
 
     -- Виртуальный размер секции, выравнивать не нужно:
-    new_section[SECTION_VSIZE] = str_off - new_section[SECTION_POFFSET] 
+    new_section[SECTION_VSIZE] = new_sect_off - new_section[SECTION_POFFSET] 
 
     -- Записать информацию о секции: 
     put_section_info(fn,

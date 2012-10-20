@@ -74,7 +74,7 @@ public constant
 public constant PUSHAD = #60, POPAD = #61
 
 public constant
-    MOV_REG_IMM   = #B0, -- + 8*width + REG
+    MOV_REG_IMM = #B0, -- + 8*width + REG
     MOV_ACC_MEM = #A0, -- + 2*dir + width
     MOV_RM_REG  = #88, -- + 2*dir + width
     MOV_REG_RM  = MOV_RM_REG+2, -- + width
