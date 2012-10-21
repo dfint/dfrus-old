@@ -181,17 +181,17 @@ function rva_to_off(atom rva, sequence section_table)
 end function
 
 public
-function rva_to_off_ex(atom off, sequence section)
-    return off + section[SECTION_POFFSET] - section[SECTION_RVA]
+function rva_to_off_ex(atom rva, sequence section)
+    return rva + section[SECTION_POFFSET] - section[SECTION_RVA]
 end function
 
 -- converts offset to relative virtual address
-function off_to_rva(atom rva, sequence section_table)
+function off_to_rva(atom off, sequence section_table)
     integer left = 1, right = length(section_table), mid
     atom loc
     while left <= right do
         mid = floor((right+left)/2)
-        loc = off - section_table[i][SECTION_POFFSET] -- local offset inside the current section
+        loc = off - section_table[mid][SECTION_POFFSET] -- local offset inside the current section
         if loc < 0 then
             right = mid-1
         elsif loc < section_table[mid][SECTION_PSIZE] then
