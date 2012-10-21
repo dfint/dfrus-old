@@ -5,6 +5,7 @@ include std/search.e
 include std/convert.e
 include std/map.e
 include std/error.e
+include std/os.e
 
 include patcher.e
 include pe.e
@@ -81,13 +82,13 @@ function load_trans_file_to_map(sequence fname)
     return trans
 end function
 
+-- Утечка памяти при при запуске в скомпилированном виде
 constant code=1, rdata = 2, data = 3
 public
 function get_cross_references(atom fn, sequence relocs, sequence sections, atom image_base)
     atom obj
     sequence objs = {}, xrefs = {}
     integer k
-
     for i = 1 to length(relocs) do
         -- Получаем смещение объекта, на который указывает перемещаемый элемент
         -- превращаем адрес в смещение и читаем что по этому смещению находится:
