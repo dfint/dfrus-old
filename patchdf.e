@@ -23,6 +23,7 @@ procedure patch_unicode_table(atom fn, atom off)
     fpoke4(fn, off+'ј'*4, cyr)
 end procedure
 
+-- DEPRECATED: не используетс€ в текущей версии, требует €вного указани€ смещени€.
 public
 function load_trans_file(sequence fname)
     object line
@@ -119,6 +120,7 @@ function get_cross_references(atom fn, sequence relocs, sequence sections, atom 
     return {objs, xrefs}
 end function
 
+-- ѕока не используетс€
 public
 function get_cross_references_to_map(atom fn, sequence relocs, sequence sections, atom image_base)
     atom obj
