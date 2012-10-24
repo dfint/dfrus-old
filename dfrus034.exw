@@ -54,6 +54,8 @@ else
     puts(1,"OK\n")
 end if
 
+-- @todo: Добавить проверку присутствия SDL.dll в импорте
+
 -----------------------------------------------------------------------------
 puts(1,"Loading translation file...\n")
 
@@ -106,15 +108,12 @@ constant
 sequence
     relocs = get_relocations(fn,sections),
 -- Получаем перекрёстные ссылки:
-    xref_table = get_cross_references(fn,relocs,sections,image_base),
+    xref_table = get_cross_references(fn,relocs,sections,image_base), -- @todo: заменить на get_cross_references_to_map()
     objs  = xref_table[1],
     xrefs = xref_table[2]
 
 -----------------------------------------------------------------------------
 puts(1,"Enabling the cyrillic alphabet...\n")
-
-/*fpoke(fn, #2F07DC, MOVZX) -- исправление MOVSX на MOVZX
-fpoke(fn, #2F063E, MOVZX) -- исправление MOVSX на MOVZX*/
 
 -- Первые несколько записей в таблице перкодировки:
 constant unicode_table_start = { #20, #263A, #263B, #2665, #2666, #2663, #2660, #2022 }
@@ -175,6 +174,12 @@ if debug then
     printf(1,"%d strings extracted.\n", length(strings))
     if length(cmd)>=5 then
         integer lo=second(value(cmd[4])), hi=second(value(cmd[5]))
+        if lo <= 0 or lo > length(strings) then
+            lo = 1
+        end if
+        if hi <= 0 or hi > length(strings) then
+            hi = length(strings)
+        end if
         strings = strings[lo..hi]
         printf(1,"%d %d %d\n",{lo,floor((lo+hi)/2),hi})
         printf(1,"From %x to %x total %d\n",{strings[1][1], strings[$][1], length(strings)})
@@ -300,13 +305,13 @@ end for
 -----------------------------------------------------------------------------
 -- Физическое добавление новой секции
 
--- Выровнять физический размер секции и файла под #200
-atom file_size = align(new_sect_off, file_alignment)
--- Указываем физический размер секции:
-new_section[SECTION_PSIZE] = file_size - new_section[SECTION_POFFSET]
-
 -- Создавать новую секцию только при ненулевом ее размере:
-if new_section[SECTION_PSIZE] > 0 then
+if new_sect_off > new_section[SECTION_POFFSET] then
+    -- Выровнять физический размер секции и файла под #200
+    atom file_size = align(new_sect_off, file_alignment)
+    -- Указываем физический размер секции:
+    new_section[SECTION_PSIZE] = file_size - new_section[SECTION_POFFSET]
+    
     puts(1,"Adding new data section...\n")
     
     -- Выровнять размер файла:
