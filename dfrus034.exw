@@ -210,6 +210,7 @@ for i = 1 to length(strings) do
     
     integer aligned_len = align(length(strings[i][2])+1) -- ћаксимальна€ длина "короткой" строки
     integer long = aligned_len<length(translation)+1
+    integer str_off
     if not long then
         -- ≈сли строка достаточно коротка€, то записать ее поверх старой:
         fpoke(fn, strings[i][1], pad_tail(translation & 0, aligned_len, 0)) -- назадействованные байты заполнить нул€ми
@@ -218,20 +219,25 @@ for i = 1 to length(strings) do
         -- ≈сли строка длинна€, то записать ее в специально отведенную дл€ этого секцию:
         aligned = align(length(translation)+1)
         fpoke(fn, new_sect_off, pad_tail(translation, aligned, 0))
+        str_off = new_sect_off
+        new_sect_off += aligned
     end if
     
     -- »справл€ем длину строк по каждой из ссылок на нее
     for j = 1 to length(s) do
         -- »справить длину строки:
-        integer fix = fix_len(fn, s[j], length(strings[i][2]), length(translation))
-        if fix != 0 then -- ”далось исправить длину, или исправление не требуетс€
+        object fix = fix_len(fn, s[j], length(strings[i][2]), length(translation))
+        if sequence(fix) then -- ‘ункци€ наткнулась на jmp и вернула машинный код указани€ длины и адрес перехода
+            -- integer disp = 
+            
+        elsif fix != 0 then -- ”далось исправить длину, или исправление не требуетс€
             if fix = -2 and debug then -- не удалось исправить длину, но скорее всего нужно
                 printf(1,"|%s|%s| <- %x (%x)\n",
                     {strings[i][2], translation} & s[j] & ( off_to_rva_ex(s[j], sections[1])+image_base ) )
                 puts(1, "SUSPICIOUS: Failed to fix length.\n")
             end if
             if long then -- ≈сли строка длинна€, то исправить ссылку на строку в коде:
-                fpoke4(fn, s[j], off_to_rva_ex(new_sect_off, new_section)+image_base)
+                fpoke4(fn, s[j], off_to_rva_ex(str_off, new_section)+image_base)
             end if
         elsif long then -- ≈сли не удалось исправить длину:
             -- —читываем 3 байта перед ссылкой дл€ нахождени€ начала копирующего кода
@@ -243,7 +249,7 @@ for i = 1 to length(strings) do
             
             if sequence(x) then
                 -- ѕолучаем машинный код, копирующий строку:
-                sequence mach = mach_memcpy(off_to_rva_ex(new_sect_off, new_section)+image_base, x[2],
+                sequence mach = mach_memcpy(off_to_rva_ex(str_off, new_section)+image_base, x[2],
                                                                             length(translation)+1)
                 integer new_ref_off = mach[$]
                 mach = mach[1..$-1]
@@ -256,13 +262,13 @@ for i = 1 to length(strings) do
                 if length(mach) > x[1] then
                     -- ѕолученный машинный код не умещаетс€ на первоначальное место
                     -- ѕрописываем его в отдельную секцию
-                    -- new_sect_off += aligned
                     -- mach &= RET_NEAR -- ѕревращаем сгенерированный код в процедуру
                     -- fpoke(fn, new_sect_off, mach)
                     -- aligned = align(length(mach))
                     -- -- ѕо первоначальному местоположению копирующего кода пропишем вызов процедуры
                     -- mach = CALL_NEAR & int_to_bytes(new_ref_off-(start+5))
                     -- new_ref = off_to_rva_ex(new_sect_off, new_section)+new_ref_off
+                    -- new_sect_off += aligned
                     if debug then
                         printf(1,"|%s|%s| <- %x (%x)\n",
                             {strings[i][2], translation} & s[j] & ( off_to_rva_ex(s[j], sections[1])+image_base ) )
@@ -289,7 +295,6 @@ for i = 1 to length(strings) do
             end if
         end if
     end for
-    new_sect_off += aligned
 end for
 
 -----------------------------------------------------------------------------
