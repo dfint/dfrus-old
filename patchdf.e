@@ -169,7 +169,7 @@ include disasm.e
 constant count = #20, count_after = #80
 public
 function fix_len(atom fn, atom off, integer oldlen, integer len)
-    atom next = off+4
+    atom next = off+4, oldnext
     sequence pre = fpeek(fn, {off-count,count}),
              aft = fpeek(fn, {next,count})
     integer r, reg
@@ -179,18 +179,21 @@ function fix_len(atom fn, atom off, integer oldlen, integer len)
     -- указывающа€ длину строки, и если да, то переход на код, прописывающий нужную длину, а потом переход
     -- на код идущий после кода указывающего старую длину
     if aft[1] = JMP_SHORT or aft[1] = JMP_NEAR then
-        jmp = 1
         integer disp -- смещение jmp
+        oldnext = next
         if aft[1] = JMP_SHORT then
             disp = check_sign_bit(aft[2],8)
-            next += 2 + disp -- 2 = 1 (опкод команды) + 1 (байт смещени€)
+            next += 1 + 1 + disp
         else
             disp = check_sign_bit(bytes_to_int(aft[2..5]),32) -- 1 байты - near jump, 2-5 - смещение
-            next += 5 + disp -- 5 = 1 (опкод команды) + 4 (смещение)
+            next += 1 + 4 + disp
         end if
+        -- ѕереходим по jmp и считываем некоторе количество байт оттуда
         aft = fpeek(fn, {next,count})
+        jmp = aft[1] -- ќтмечаем, что байты получены после перехода по jmp
     elsif aft[1] = CALL_NEAR or and_bits(aft[1], #F0) = JCC_SHORT or
                     (aft[1] = JCC_NEAR[1] and and_bits(aft[2], #F0) = JCC_NEAR[2]) then
+        -- ѕо условным переходам и вызовам подпрогамм мы не ходим
         aft = {}
     end if
 
@@ -203,9 +206,10 @@ function fix_len(atom fn, atom off, integer oldlen, integer len)
                 fpoke(fn,off-2,len)
                 return 1
             elsif length(aft)>0 and aft[1] = PUSH_IMM8 and aft[2] = oldlen then -- push len
-                if jmp = 1 then
-                    -- puts(1,"push immediate\n")
-                    return -1
+                if jmp then
+                    -- ? jmp = JMP_NEAR
+                    -- ¬озвращаем маш. код указани€ длины строки и старый адрес перехода:
+                    return {PUSH_IMM8, len, next}
                 end if
                 fpoke(fn,next+1,len)
                 return 1
@@ -215,9 +219,10 @@ function fix_len(atom fn, atom off, integer oldlen, integer len)
                 return 1
             elsif length(aft)>0 and aft[1] = MOV_REG_IMM + 8 + EDI and
                     bytes_to_int(aft[2..5]) = oldlen then -- mov edi,len ; после
-                if jmp = 1 then
-                    -- puts(1,"mov edi, len\n")
-                    return -1
+                if jmp then
+                    -- ? jmp = JMP_NEAR
+                    -- ¬озвращаем маш. код указани€ длины строки и старый адрес перехода:
+                    return (MOV_REG_IMM + 8 + EDI) & int_to_bytes(len) & next
                 end if
                 fpoke4(fn,next+1,len)
                 return 1
@@ -232,8 +237,8 @@ function fix_len(atom fn, atom off, integer oldlen, integer len)
                 end if
             elsif length(aft)>0 and aft[1] = MOV_REG_RM+1 and and_bits(aft[2],#F8) = glue_triads(3,ECX,0) -- mov ecx, reg
                     and aft[3] = PUSH_IMM8 and aft[4] = oldlen then -- push len
-                if jmp = 1 then
-                    -- puts(1, "mov ecx,reg; push len\n")
+                if jmp then
+                    -- mov ecx,reg ++ push len не обрабатываем
                     return -1
                 end if
                 fpoke(fn,next+3,len)
