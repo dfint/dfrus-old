@@ -6,6 +6,7 @@ include std/search.e
 include std/get.e
 include std/sequence.e
 include std/map.e
+include std/convert.e
 
 -- with trace
 include patcher.e
@@ -149,17 +150,18 @@ constant
 -- "Прототип" новой секции:
 sequence new_section = {
     ".rus",
-    0, -- Virtual Size
+    0, -- Virtual Size -- виртуальный размер пока не известен
     align(sections[$][SECTION_RVA]+sections[$][SECTION_VSIZE],
         section_alignment), -- RVA -- выровнять под #1000
-    0, -- Phisical Size
+    0, -- Phisical Size -- физический размер пока не известен
     align(sections[$][SECTION_POFFSET] + sections[$][SECTION_PSIZE],
         file_alignment), -- Phisical Offset -- Выровнять под #200
     0,0,0,0, -- reserved
-    IMAGE_SCN_CNT_INITIALIZED_DATA + IMAGE_SCN_MEM_READ -- readable data
+    IMAGE_SCN_CNT_INITIALIZED_DATA + IMAGE_SCN_MEM_READ + IMAGE_SCN_MEM_EXECUTE -- readable code/data
 }
 
-atom str_off = new_section[SECTION_POFFSET]
+atom new_sect_off = new_section[SECTION_POFFSET] -- Смещение в новой секции
+integer aligned = 0
 
 -----------------------------------------------------------------------------
 puts(1,"Translating...\n")
@@ -168,9 +170,6 @@ function second(sequence s)
     return s[2]
 end function
 
-sequence s, pre, mach
-integer aligned = 0, k, l, delta, start, long, alen
-object x, translation
 sequence strings = extract_strings(fn, objs)
 if debug then
     printf(1,"%d strings extracted.\n", length(strings))
@@ -183,7 +182,7 @@ if debug then
 end if
 
 for i = 1 to length(strings) do
-    translation = map:get(trans, strings[i][2])
+    object translation = map:get(trans, strings[i][2])
     if atom(translation) then
         -- if debug then
             -- printf(1,"Translation not found for \"%s\".\n", {strings[i][2]})
@@ -194,14 +193,14 @@ for i = 1 to length(strings) do
         continue -- перевод равен оригиналу
     end if
     -- Поиск строки в таблице объектов:
-    k = binary_search(strings[i][1], objs)
-    s = xrefs[k] -- список ссылок на данную строку
+    integer k = binary_search(strings[i][1], objs)
+    sequence s = xrefs[k] -- список ссылок на данную строку
     
     -- Находим ссылки на середину строки
-    l = 1
+    integer l = 1
     while objs[k+l]-strings[i][1] < length(strings[i][2])+1 do
         for j = 1 to length(s) do
-            delta =  s[j] - xrefs[k+l][1]
+            integer delta =  s[j] - xrefs[k+l][1]
             if length(xrefs[k+l]) = 1 and delta>0 and delta<=6 then
                 s[j] = xrefs[k+l][1]
             end if
@@ -209,66 +208,85 @@ for i = 1 to length(strings) do
         l += 1
     end while
     
-    alen = align(length(strings[i][2])+1) -- Максимальная длина "короткой" строки
-    long = alen<length(translation)+1
+    integer aligned_len = align(length(strings[i][2])+1) -- Максимальная длина "короткой" строки
+    integer long = aligned_len<length(translation)+1
+    integer str_off
     if not long then
         -- Если строка достаточно короткая, то записать ее поверх старой:
-        fpoke(fn, strings[i][1], pad_tail(translation & 0, alen, 0)) -- назадействованные байты заполнить нулями
+        fpoke(fn, strings[i][1], pad_tail(translation & 0, aligned_len, 0)) -- назадействованные байты заполнить нулями
+        aligned = 0
     else
         -- Если строка длинная, то записать ее в специально отведенную для этого секцию:
-        str_off += aligned
         aligned = align(length(translation)+1)
-        fpoke(fn, str_off, pad_tail(translation, aligned, 0))
+        fpoke(fn, new_sect_off, pad_tail(translation, aligned, 0))
+        str_off = new_sect_off
+        new_sect_off += aligned
     end if
     
+    -- Исправляем длину строк по каждой из ссылок на нее
     for j = 1 to length(s) do
         -- Исправить длину строки:
-        integer fix = fix_len(fn, s[j], length(strings[i][2]), length(translation))
-        if fix != 0 then
-            if fix = -2 and debug then
+        object fix = fix_len(fn, s[j], length(strings[i][2]), length(translation))
+        if sequence(fix) then -- Функция наткнулась на jmp и вернула машинный код указания длины и адрес перехода
+            -- integer disp = 
+            
+        elsif fix != 0 then -- Удалось исправить длину, или исправление не требуется
+            if fix = -2 and debug then -- не удалось исправить длину, но скорее всего нужно
                 printf(1,"|%s|%s| <- %x (%x)\n",
                     {strings[i][2], translation} & s[j] & ( off_to_rva_ex(s[j], sections[1])+image_base ) )
-                puts(1, "Failed to fix length.\n")
+                puts(1, "SUSPICIOUS: Failed to fix length.\n")
             end if
-            if long then -- Если строка длинная,
-                -- то исправить ссылку на строку в коде:
+            if long then -- Если строка длинная, то исправить ссылку на строку в коде:
                 fpoke4(fn, s[j], off_to_rva_ex(str_off, new_section)+image_base)
             end if
         elsif long then -- Если не удалось исправить длину:
             -- Считываем 3 байта перед ссылкой для нахождения начала копирующего кода
-            pre = fpeek(fn, {s[j]-3, 3})
+            sequence pre = fpeek(fn, {s[j]-3, 3})
             -- Находим начало копирующего кода:
-            start = s[j]-get_start(pre)
+            integer start = s[j]-get_start(pre)
             -- Получаем длину кода, копирующего строку:
-            x = get_length( fpeek(fn, {start, 100}), length(strings[i][2])+1)
+            object x = get_length( fpeek(fn, {start, 100}), length(strings[i][2])+1)
             
             if sequence(x) then
                 -- Получаем машинный код, копирующий строку:
-                mach = mach_memcpy(off_to_rva_ex(str_off, new_section)+image_base, x[2], length(translation)+1)
+                sequence mach = mach_memcpy(off_to_rva_ex(str_off, new_section)+image_base, x[2],
+                                                                            length(translation)+1)
                 integer new_ref_off = mach[$]
                 mach = mach[1..$-1]
                 -- Добавляем в машинный код затираемое lea, т.к. значение может использоваться ниже по коду:
                 if sequence(x[4]) then
                     mach &= lea(x[4][1],x[4][2..3])
                 end if
+                integer start_rva = off_to_rva_ex(start, sections[1]) -- RVA начала изменяемого кода
+                integer new_ref -- Адрес новой ссылки
                 if length(mach) > x[1] then
+                    -- Полученный машинный код не умещается на первоначальное место
+                    -- Прописываем его в отдельную секцию
+                    -- mach &= RET_NEAR -- Превращаем сгенерированный код в процедуру
+                    -- fpoke(fn, new_sect_off, mach)
+                    -- aligned = align(length(mach))
+                    -- -- По первоначальному местоположению копирующего кода пропишем вызов процедуры
+                    -- mach = CALL_NEAR & int_to_bytes(new_ref_off-(start+5))
+                    -- new_ref = off_to_rva_ex(new_sect_off, new_section)+new_ref_off
+                    -- new_sect_off += aligned
                     if debug then
                         printf(1,"|%s|%s| <- %x (%x)\n",
                             {strings[i][2], translation} & s[j] & ( off_to_rva_ex(s[j], sections[1])+image_base ) )
                         printf(1, "Mach code is too long (%d against %d).\n",{length(mach),x[1]})
                     end if
                     continue -- полученный машинный код не уместился
+                else
+                    new_ref = start_rva+new_ref_off
                 end if
                 mach = pad_tail(mach, x[1], NOP) -- добиваем освободившиеся байты пустыми командами
                 fpoke(fn, start, mach) -- патчим код!
                 -- Исправляем битые релокации --
-                -- Преобразуем смещение начала измененного кода в его относительный адрес:
-                start = off_to_rva_ex(start, sections[1])
-                x[3] += start-1 -- получаем адреса удаленных ссылок
-                if modify_relocations(fn, sections, (-x[3]) & (start+new_ref_off)) != 0 and debug then
-                printf(1,"|%s|%s| <- %x (%x)\n",
-                    {strings[i][2], translation} & s[j] & ( off_to_rva_ex(s[j], sections[1])+image_base ) )
-                    puts(1, "Failed to fix relocations.\n")
+                x[3] += start_rva-1 -- получаем адреса удаленных ссылок
+                integer mod_reloc = modify_relocations(fn, sections, (-x[3]) & new_ref)
+                if mod_reloc != 0 and debug then
+                    printf(1,"|%s|%s| <- %x (%x)\n",
+                        {strings[i][2], translation} & s[j] & ( off_to_rva_ex(s[j], sections[1])+image_base ) )
+                    printf(1, "Failed to fix relocations (Error code %d).\n",mod_reloc)
                 end if
             elsif debug then
                 printf(1,"|%s|%s| <- %x (%x)\n",
@@ -278,13 +296,13 @@ for i = 1 to length(strings) do
         end if
     end for
 end for
-str_off+=aligned
 
 -----------------------------------------------------------------------------
 -- Физическое добавление новой секции
 
 -- Выровнять физический размер секции и файла под #200
-atom file_size = align(str_off, file_alignment)
+atom file_size = align(new_sect_off, file_alignment)
+-- Указываем физический размер секции:
 new_section[SECTION_PSIZE] = file_size - new_section[SECTION_POFFSET]
 
 -- Создавать новую секцию только при ненулевом ее размере:
@@ -296,7 +314,7 @@ if new_section[SECTION_PSIZE] > 0 then
     puts(fn,0)
 
     -- Виртуальный размер секции, выравнивать не нужно:
-    new_section[SECTION_VSIZE] = str_off - new_section[SECTION_POFFSET] 
+    new_section[SECTION_VSIZE] = new_sect_off - new_section[SECTION_POFFSET] 
 
     -- Записать информацию о секции: 
     put_section_info(fn,
