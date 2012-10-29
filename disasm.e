@@ -13,23 +13,30 @@ public constant
 -- Префиксы замены сегментов:
 public constant
     SEG_CS = #2E,
-    SEG_SS = #36,
     SEG_DS = #3E,
     SEG_ES = #26,
+    SEG_SS = #36,
     SEG_FS = #64,
     SEG_GS = #65
 
 public constant
-    JMP_SHORT = #EB,
     JMP_NEAR  = #E9,
+    JMP_SHORT = JMP_NEAR+2,
+    JMP_INDIR = {#0F,#25},
     JCC_SHORT = #70, -- + cond
     JCC_NEAR  = {#0F,#80} -- + {0,cond}
 
 public constant
-    CALL_NEAR = #E8
+    CMP_RM_IMM = #80
 
 public constant
-    RET_NEAR = #C3
+    CALL_NEAR   = #E8,
+    CALL_INDIR  = {#FF, #10}
+
+public constant
+    RET_NEAR    = #C3,
+    LEAVE       = #C9,
+    INT3        = #CC
 
 -- Коды условий
 public constant
@@ -51,25 +58,42 @@ public constant
     COND_NLE = COND_LE+1, COND_G = COND_NLE, -- Not Less or Equal, Greater
     $
 
+constant conds = {"o","no","b","nb","z","nz","na","a","s","ns","p","np","l","nl","ng","g"}
+
 -- Коды регистров:
 public constant
-    AL = 0, AX = 0, EAX = 0,
-    CL = 1, CX = 1, ECX = 1,
-    DL = 2, DX = 2, EDX = 2,
-    BL = 3, BX = 3, EBX = 3,
-    AH = 4, SP = 4, ESP = 4,
-    CH = 5, BP = 5, EBP = 5,
+    AL = 0, AX = 0, EAX = 0, ES = 0,
+    CL = 1, CX = 1, ECX = 1, CS = 1,
+    DL = 2, DX = 2, EDX = 2, SS = 2,
+    BL = 3, BX = 3, EBX = 3, DS = 3,
+    AH = 4, SP = 4, ESP = 4, FS = 4,
+    CH = 5, BP = 5, EBP = 5, GS = 5,
     DH = 6, SI = 6, ESI = 6,
     BH = 7, DI = 7, EDI = 7
+
+constant regs = {
+    {"al","ax","eax","es"},
+    {"cl","cx","ecx","cs"},
+    {"dl","dx","edx","ss"},
+    {"bl","bx","ebx","ds"},
+    {"ah","sp","esp","fs"},
+    {"ch","bp","ebp","gs"},
+    {"dh","si","esi"},
+    {"bh","di","edi"}
+}
 
 -- push
 public constant
     PUSH_REG    = #50, -- + REG
-    PUSH_IMM8   = #6A,
-    PUSH_IMM32  = #68
+    PUSH_IMM32  = #68,
+    PUSH_IMM8   = PUSH_IMM32 + 2,
+    PUSH_INDIR  = {#FF,#30}, -- + размер смещение * 40h + базовый регистр [& SIB]
+    PUSHFD      = #9C,
+    $
 
 public constant
-    POP_REG     = #58 -- + REG
+    POP_REG     = #58, -- + REG
+    POP_RM      = #8F
 
 public constant PUSHAD = #60, POPAD = #61
 
@@ -78,10 +102,16 @@ public constant
     MOV_ACC_MEM = #A0, -- + 2*dir + width
     MOV_RM_REG  = #88, -- + 2*dir + width
     MOV_REG_RM  = MOV_RM_REG+2, -- + width
+    MOV_MEM_IMM = #C7,
+    MOV_RM_SEG  = #8C, -- + 2*dir
     $
 
 public constant
-    XOR_RM_REG = #30 -- + 2*dir + width
+    XOR_RM_REG  = #30, -- + 2*dir + width
+    SUB_REG_RM  = #2B,
+    SUB_RM_IMM  = #81,
+    ADD_RM_IMM  = #83, -- #80 + 3*width
+    $
 
 public constant LEA = #8D
 
@@ -90,8 +120,6 @@ public constant NOP = #90
 public constant MOVZX = {#0F,#B6}, MOVSX = {#0F,#BE}
 
 public constant MOVSB = #A4, MOVSD = #A5, MOVSW = PREFIX_OPERAND_SIZE & MOVSD
-
--- public constant MOD_MASK = #C0
 
 -- Разбить байт на триады
 public
@@ -143,9 +171,14 @@ end function
 
 -- В соответствии с битом знака изменить знак числа
 public
-function check_sign_bit(atom x, integer w) -- x - значение, w - ширина в битах (номер бита знака + 1)
-    if and_bits(x, power(2, w-1)) then
-        x -= power(2, w)
+function check_sign_bit(atom x, integer w = 8) -- x - значение, w - ширина в битах (номер бита знака + 1)
+    atom pow2w = power(2, w)
+    if x >= pow2w then
+        w = 32
+        pow2w = power(2, w)
+    end if
+    if and_bits(x, pow2w/2) then
+        x -= pow2w
     end if
     return x
 end function
@@ -210,7 +243,8 @@ function analyse_modrm(sequence s, integer i)
             end if
         end if
     end if
-    return result & i -- {{триады байта modrm}, [{триады байта sib},] смещение, i}
+    -- @todo: привести к однозначому виду: если sib нет, вместо него писать -1, если смещения нет - 0
+    return result & i -- {{триады байта modrm}, [{триады байта sib},] [смещение,] i}
 end function
 
 -- Попытка вынести анализирующий код в отдельную функцию
@@ -236,4 +270,276 @@ function analyse_mach(sequence s, integer i=1)
         return -1
     end if
     return result -- {{операция}, {modrm}, {sib}, непосредственный операнд, индекс следующей инструкции}
+end function
+
+include std/math.e
+
+-- Преобразование числа в 16-ричное представление, принятое в ассемблере (вида 0ABCDh)
+function asmhex(atom x, integer width=1)
+    sequence s = ""
+    if x<0 then
+        s &= '-'
+        x = -x
+    end if
+    s &= sprintf(sprintf("%%0%dx",width),x)
+    -- Если по модулю больше или равно 0Ah, то добавляем h в конце
+    if x >= #A then
+        s &= 'h'
+    end if
+    -- Если начинается с буквы, то добавлять 0 в начало:
+    if s[1]>='A' and s[1]<='F' then
+        s = '0' & s
+    end if
+    return s
+end function
+
+-- Приведение вывода функции analyse_modrm к унифицированному виду
+-- Вид возвращаемого значения:
+-- { регистр, {масштаб (-1 если нет), индексный регистр (-1 если нет), базовый регистр (-1 если нет), смещение (0 если нет)} }
+function unify_operands(sequence x)
+    -- ? x
+    integer op1 = x[1][2]
+    object op2
+    if x[1][1] = 3 then -- Регистровая адресация
+        op2 = x[1][3]
+    else
+        if x[1][1] = 0 and x[1][3] = 5 then -- Непосредственная адресация
+            op2 = {-1, -1, -1, x[$-1]} -- {масштаб, индекс, база, смещение}
+        else
+            if x[1][3] != 4 then -- Указание способа адресации при помощи MOD R/M
+                op2 = {0, x[1][3], -1, 0}
+            else -- Указание способа адресации при помощи SIB
+                op2 = x[2] & 0
+                if x[2][2] = 4 then
+                    op2[2] = -1
+                end if
+            end if
+            
+            if x[1][1] > 0 then
+                op2[$] = x[$-1]
+            end if
+        end if
+    end if
+    return {op1, op2}
+end function
+
+function op_to_text(object op)
+    -- ? op
+    sequence text
+    if atom(op) then
+        text = regs[op+1][3]
+    else
+        text = "["
+        if op[1]>0 then
+            text &= sprintf("%d*",power(2,op[1]))
+        end if
+        if op[2]>=0 then
+            text &= regs[op[2]+1][3]
+        end if
+        if op[3]>=0 then
+            if op[2]>= 0 then
+                text &= '+'
+            end if
+            text &= regs[op[3]+1][3]
+        end if
+        if op[4]!=0 then
+            if op[2]>=0 or op[3]>=0 then
+                if op[4]>=0 then
+                    text &= '+'
+                else
+                    text &= '-'
+                    op[4]=-op[4]
+                end if
+            end if
+            text &= asmhex(op[4])
+        elsif op[2]=-1 and op[3]=-1 then
+            text &= '0'
+        end if
+        text &= ']'
+    end if
+    return text
+end function
+
+-- Если flag установлен, поменять местами первый и второй элемент
+function swap(sequence x, integer flag=1)
+    if flag then
+        return {x[2],x[1]}
+    else
+        return x
+    end if
+end function
+
+constant seg_tags = {"cs:","ds:","es:","ss:","fs:","gs:"}
+constant op_sizes = {"byte","word","dword"}
+
+-- Набросок функции, по введенному машинному коду возвращающей его ассемблерное представление
+public
+function disasm(integer start_addr, sequence s, integer i=1)
+    sequence text, op_prefix={}
+    integer j = i
+    integer addr = start_addr+i-1
+    integer seg
+    -- Прежде всего, нужно разобрать префиксы. Некоторые префиксы (REP, например) можно отображать как отдельные инструкции
+    seg = find(s[i],{SEG_CS,SEG_DS,SEG_ES,SEG_SS,SEG_FS,SEG_GS})
+    if seg then
+        op_prefix = seg_tags[seg]
+        i += 1
+    end if
+    if s[i] = NOP then
+        text = "nop"
+        i += 1
+    elsif s[i] = RET_NEAR then
+        text = "retn"
+        i += 1
+    elsif s[i] = PUSHFD then
+        text = "pushfd"
+        i += 1
+    elsif s[i] = LEAVE then
+        text = "leave"
+        i += 1
+    elsif s[i] = INT3 then
+        text = "int3"
+        i += 1
+    elsif s[i] = CALL_NEAR then
+        atom immediate = addr+5+check_sign_bit(bytes_to_int(s[i+1..i+4]),32)
+        text = sprintf("call near %s",{asmhex(immediate)})
+        i += 5
+    elsif s[i] = JMP_NEAR then
+        atom immediate = addr+5+check_sign_bit(bytes_to_int(s[i+1..i+4]),32)
+        text = sprintf("jmp near %s",{asmhex(immediate)})
+        i += 5
+    elsif s[i] = JMP_SHORT then
+        integer immediate = addr+2+check_sign_bit(s[i+1])
+        text = sprintf("jmp short %s",{asmhex(immediate)})
+        i += 2
+    elsif and_bits(s[i],#F8) = JCC_SHORT then
+        integer immediate = addr+2+check_sign_bit(s[i+1])
+        text = sprintf("j%s short %s",{conds[and_bits(s[i],7)+1], asmhex(immediate)})
+        i += 2
+    elsif s[i] = LEA then
+        sequence x = analyse_modrm(s,i+1)
+        i = x[$]
+        x = unify_operands(x)
+        text = sprintf("lea %s, %s", {op_to_text(x[1]), op_to_text(x[2])})
+    elsif s[i] = SUB_REG_RM then
+        sequence x = analyse_modrm(s,i+1)
+        i = x[$]
+        x = unify_operands(x)
+        text = sprintf("sub %s, %s", {op_to_text(x[1]), op_to_text(x[2])})
+    elsif s[i] = SUB_RM_IMM then
+        sequence x = analyse_modrm(s,i+1)
+        if x[1][2] = 5 then
+            i = x[$]
+            x = unify_operands(x)
+            atom immediate = bytes_to_int(s[i..i+3])
+            text = sprintf("sub %s, %s", {op_to_text(x[2]), asmhex(immediate)})
+            i += 4
+        end if
+    elsif and_bits(s[i],#FC) = MOV_RM_REG then
+        integer d = and_bits(s[i],2)
+        sequence x = analyse_modrm(s,i+1)
+        i = x[$]
+        x = unify_operands(x)
+        text = sprintf("mov %s, %s", swap({op_to_text(x[1]), op_prefix & op_to_text(x[2])},not d))
+    elsif s[i] = MOV_MEM_IMM then
+        sequence x = analyse_modrm(s,i+1)
+        if x[1][2] = 0 then
+            i = x[$]
+            x = unify_operands(x)
+            atom immediate = bytes_to_int(s[i..i+3])
+            text = sprintf("mov %s, %s", {op_to_text(x[2]), asmhex(immediate)})
+            i += 4
+        end if
+    elsif and_bits(s[i],#FD) = MOV_RM_SEG then
+        integer d = and_bits(s[i],2)
+        sequence x = analyse_modrm(s,i+1)
+        i = x[$]
+        x = unify_operands(x)
+        text = sprintf("mov %s, %s", swap({regs[x[1]+1][4], op_prefix & op_to_text(x[2])}, not d))
+    elsif and_bits(s[i],#FC) = MOV_ACC_MEM then
+        integer d = and_bits(s[i],2)
+        integer immediate = bytes_to_int(s[i+1..i+4])
+        text = sprintf("mov %s, %s", swap({regs[EAX+1][3],op_prefix&'['&asmhex(immediate)&']'},d))
+        i += 5
+    elsif and_bits(s[i],#FC) = XOR_RM_REG then
+        sequence x = analyse_modrm(s,i+1)
+        i = x[$]
+        x = unify_operands(x)
+        text = sprintf("xor %s, %s", {op_to_text(x[1]), op_to_text(x[2])})
+    elsif and_bits(s[i],#F8) = PUSH_REG then
+        integer reg = and_bits(s[i],7)
+        text = sprintf("push %s",{regs[reg+1][3]})
+        i += 1
+    elsif and_bits(s[i],#FD) = PUSH_IMM32 then
+        integer size = and_bits(s[i],2)
+        atom immediate
+        if size then
+            immediate = s[i+1]
+            i += 2
+        else
+            immediate = bytes_to_int(s[i+1..i+4])
+            i += 5
+        end if
+        text = sprintf("push %s",{asmhex(immediate)})
+    elsif and_bits(s[i],#F8) = POP_REG then
+        integer reg = and_bits(s[i],7)
+        text = sprintf("pop %s",{regs[reg+1][3]})
+        i += 1
+    elsif s[i] = POP_RM then
+        sequence x = analyse_modrm(s,i+1)
+        i = x[$]
+        x = unify_operands(x)
+        text = sprintf("pop dword ptr %s", {op_to_text(x[2])})
+    elsif and_bits(s[i],#FC) = CMP_RM_IMM then
+        integer flags = and_bits(s[i],3)
+        
+        if flags != 2 then
+            sequence x = analyse_modrm(s,i+1)
+            if x[1][2] = 7 then
+                i = x[$]
+                x = unify_operands(x)
+                text = "cmp "
+                if flags = 0 then
+                    text &= "byte ptr "
+                else
+                    text &= "dword ptr "
+                end if
+                text &= op_to_text(x[2]) & ", "
+                atom immediate
+                if flags = 1 then
+                    immediate = bytes_to_int(s[i..i+3])
+                    i += 4
+                else
+                    immediate = s[i]
+                    i += 1
+                end if
+                text &= asmhex(immediate)
+            end if
+        end if
+    elsif s[i] = #FF then
+        i += 1
+        if s[i] = JMP_INDIR[2] then
+            integer immediate = bytes_to_int(s[i+1..i+4])
+            text = sprintf("jmp dword ptr %s[%s]",{op_prefix,asmhex(immediate)})
+            i += 5
+        elsif and_bits(s[i],#38) = PUSH_INDIR[2] then
+            sequence x = analyse_modrm(s,i) -- байт mod r/m накладывается на опкод
+            i = x[$]
+            x = unify_operands(x)
+            text = sprintf("push dword ptr %s%s", {op_prefix, op_to_text(x[2])})
+        elsif and_bits(s[i],#38) = CALL_INDIR[2] then
+            sequence x = analyse_modrm(s,i) -- байт mod r/m накладывается на опкод
+            i = x[$]
+            x = unify_operands(x)
+            text = sprintf("call dword ptr %s%s", {op_prefix, op_to_text(x[2])})
+        end if
+    end if
+    
+    if not object(text) then
+        i = j
+        text = sprintf("db %s", {asmhex(s[i])})
+        i += 1
+    end if
+    
+    return {addr,text,i}
 end function
