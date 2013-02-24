@@ -9,9 +9,9 @@ include patcher.e
 
 -- atom fn = open("d:\\Games\\df_34_09_win\\Dwarf Fortress.exe","rb")
 atom fn = open("d:\\Games\\df_34_11_win\\Dwarf Fortress Rus.exe","ub")
-constant pe_header = check_pe(fn)
+constant header = check_pe(fn)
 
-seek(fn,pe_header)
+seek(fn,header)
 printf(1,"Signature: %s\n",{get_bytes(fn,4)})
 puts(1,'\n')
 printf(1,"Machine: %xh\n",get_integer16(fn))

@@ -27,6 +27,7 @@ public enum
     ET_CORE,        -- Core file
     ET_LOPROC = #FF00, -- Processor specific
     ET_HIPROC = #FFFF, -- Processor specific
+    $
 
 -- Values of the e_machine field
 public enum
@@ -38,12 +39,13 @@ public enum
     EM_88K,      -- Motorola 88000
     EM_860 = 7,  -- Intel 80860
     EM_MIPS,     -- MIPS RS3000
+    $
 
 public constant EV_NONE = 0, EV_CURRENT = 1
 
 -- Индексы в массиве e_ident, с учетом того, что индексация в Euphoria начинается с 1
 public enum
-    EI_MAG = 1, EI_MAG0 = 1, EI_MAG1, EI_MAG2, EI_MAG3, -- "\x7fELF"
+    EI_MAG = 0, EI_MAG0 = 0, EI_MAG1, EI_MAG2, EI_MAG3, -- "\x7fELF"
     EI_CLASS, EI_DATA, EI_VERSION, EI_PAD, EI_NIDENT = 16
 
 public constant ELFMAG = #7F & "ELF"
@@ -99,3 +101,13 @@ public constant
     SHF_EXECINSTR   = #4,
     SHF_MASKPROC    = #F0000000
 
+include patcher.e
+public include std/io.e
+
+public function check_header(atom fn)
+    if equal(fpeek(fn, {E_IDENT+EI_MAG, 4}), ELFMAG) then -- check ELF signature
+        return 0 -- return zero offset
+    else
+        return -1
+    end if
+end function
