@@ -1,0 +1,24 @@
+-- Тестовая программа для проверки правильности работы функций модуля elf.e
+
+include std/pretty.e
+include std/search.e
+include std/console.e
+
+include elf.e
+include patcher.e
+
+atom fn = open("d:\\Games\\df_linux\\libs\\Dwarf_Fortress","rb")
+constant header = check_header(fn)
+
+seek(fn,header)
+puts(1, "e_ident:\n")
+printf(1, " EI_MAG: #%x, \"%s\"\n",{getc(fn),get_bytes(fn,3)})
+printf(1, " EI_CLASS: %d-bit objects\n", 32*getc(fn))
+constant byte_order = {"least significant byte first", "most significant byte first"}
+printf(1, " EI_DATA: %s\n",{byte_order[getc(fn)]})
+printf(1, " EI_VERSION: %d\n", getc(fn))
+printf(1, " EI_PAD: %d\n", getc(fn))
+
+
+
+wait_key()
