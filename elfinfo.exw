@@ -17,8 +17,42 @@ printf(1, " EI_CLASS: %d-bit objects\n", 32*getc(fn))
 constant byte_order = {"least significant byte first", "most significant byte first"}
 printf(1, " EI_DATA: %s\n",{byte_order[getc(fn)]})
 printf(1, " EI_VERSION: %d\n", getc(fn))
-printf(1, " EI_PAD: %d\n", getc(fn))
+puts(1, "Padding bytes:\n")
+? get_bytes(fn,9)
 
+puts(1, '\n')
+constant e_types = {"ET_NONE","ET_REL","ET_EXEC","ET_DYN","ET_CORE"}
+printf(1, "e_type: %s\n", {e_types[get_integer16(fn)+1]})
+constant e_machines = {
+    "None",
+    "AT&T WE 32100",
+    "SPARC",
+    "Intel 80386",
+    "Motorola 68000",
+    "Motorola 88000",
+    "Intel 80860",
+    "MIPS RS3000"
+}
+printf(1, "e_machine: %s\n", {e_machines[get_integer16(fn)+1]})
+constant e_versions = {"None","Current"}
+printf(1, "e_version: %s\n", {e_versions[get_integer32(fn)+1]})
+printf(1, "e_entry: #%x\n", get_integer32(fn))
+printf(1, "e_phoff: #%x\n", get_integer32(fn))
+printf(1, "e_shoff: #%x\n", get_integer32(fn))
+printf(1, "e_flags: #%x\n", get_integer32(fn))
+printf(1, "e_ehsize: #%x\n", get_integer16(fn))
+printf(1, "e_phentsize: #%x\n", get_integer16(fn))
+printf(1, "e_phnum: #%x\n", get_integer16(fn))
+printf(1, "e_shentsize: #%x\n", get_integer16(fn))
+printf(1, "e_shnum: #%x\n", get_integer16(fn))
+printf(1, "e_shstrndx: #%x\n", get_integer16(fn))
+puts(1,'\n')
+
+sequence sections = get_section_table(fn)
+puts(1,"       Name          Type     Flags   Address  Offset    Size     Link     Info    Align  Ent. size\n")
+for i = 1 to length(sections) do
+    printf(1,"%-18s %08x %08x %08x %08x %08x %08x %08x %08x %08x\n", sections[i])
+end for
 
 
 wait_key()

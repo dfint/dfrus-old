@@ -115,6 +115,21 @@ function fpeek4s(atom fn, object off)
     return x
 end function
 
+constant MAX_LEN = #10000
+public
+function fpeek_string(atom fn, atom off)
+    sequence s = {}
+    seek(fn,off)
+    for i = 0 to MAX_LEN-1 do
+        integer c = getc(fn)
+        if c = 0 then
+            return s
+        end if
+        s &= c
+    end for
+    return -1 -- too long string
+end function
+
 public
 procedure fpoke(atom fn, atom off, object x)
     seek(fn,off)
