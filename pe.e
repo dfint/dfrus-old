@@ -117,21 +117,21 @@ function get_section_table(atom fn, atom pe=0)
         pe = fpeek4u(fn, MZ_LFANEW)
     end if
     n = fpeek2u(fn, pe + PE_NUMBER_OF_SECTIONS)
-    sequence sh = repeat(repeat(0,10),n)
+    sequence section_table = repeat(repeat(0,10),n)
     seek(fn, pe + SIZEOF_PE_HEADER)
     for i = 1 to n do
-        sh[i][1] = get_bytes(fn,8) -- Name
-        if sh[i][$] = 0 then -- Truncate trailing zeros
-            sh[i][1] = sh[i][1][1..find(0,sh[i][1])-1]
+        section_table[i][1] = get_bytes(fn,8) -- Name
+        if section_table[i][$] = 0 then -- Truncate trailing zeros
+            section_table[i][1] = section_table[i][1][1..find(0,section_table[i][1])-1]
         end if
         for j = 2 to 7 do
-            sh[i][j] = get_integer32(fn)
+            section_table[i][j] = get_integer32(fn)
         end for
-        sh[i][8] = get_integer16(fn)
-        sh[i][9] = get_integer16(fn)
-        sh[i][10] = get_integer32(fn)
+        section_table[i][8] = get_integer16(fn)
+        section_table[i][9] = get_integer16(fn)
+        section_table[i][10] = get_integer32(fn)
     end for
-    return sh
+    return section_table
 end function
 
 public

@@ -16,7 +16,8 @@ public constant
     E_PHNUM     = #2C, -- + 2
     E_SHENTSIZE = #2E, -- + 2 -- Размер структуры, описывающей каждую секцию
     E_SHNUM     = #30, -- + 2 -- Количество секций
-    SIZEOF_EHDR = #32  -- 50
+    E_SHSTRNDX  = #32, -- + 2 -- Индекс таблицы имен в таблице секций
+    SIZEOF_EHDR = #34  -- 52
 
 -- Values of the e_type field
 public enum
@@ -95,11 +96,9 @@ public enum
     SHT_LOUSER = #80000000,
     SHT_HIUSER = #FFFFFFFF
 
-public constant
-    SHF_WRITE       = #1,
-    SHF_ALLOC       = #2,
-    SHF_EXECINSTR   = #4,
-    SHF_MASKPROC    = #F0000000
+public enum by * 2
+    SHF_WRITE = #1, SHF_ALLOC, SHF_EXECINSTR,
+    SHF_MASKPROC = #F0000000
 
 include patcher.e
 public include std/io.e
@@ -110,4 +109,36 @@ public function check_header(atom fn)
     else
         return -1
     end if
+end function
+
+public enum
+    SECTION_NAME,       -- section name
+    SECTION_TYPE,       -- section type
+    SECTION_FLAGS,      -- section flags
+    SECTION_ADDRESS,    -- section virtual address
+    SECTION_OFFSET,     -- section phisical offset
+    SECTION_SIZE,       -- section phisical or virtual size
+    SECTION_LINK,       -- section header table index link
+    SECTION_INFO,       -- section additional info
+    SECTION_ADDRALIGN,  -- section address alignment
+    SECTION_ENTSIZE,    -- section entry size
+    $
+
+public function get_section_table(atom fn)
+    atom section_header_off = fpeek4u(fn, E_SHOFF)
+    integer n = fpeek2u(fn, E_SHNUM)
+    sequence section_table = repeat(0,n)
+    seek(fn, section_header_off)
+    for i = 1 to n do
+        section_table[i] = get_dwords(fn, 10)
+    end for
+    atom strtab = fpeek2u(fn, E_SHSTRNDX)
+    if strtab != SHN_UNDEF then
+        atom strtab_off = section_table[strtab+1][SECTION_OFFSET]
+        for i = 1 to n do
+            sequence name = fpeek_string(fn,strtab_off+section_table[i][SECTION_NAME])
+            section_table[i][SECTION_NAME] = name
+        end for
+    end if
+    return section_table
 end function

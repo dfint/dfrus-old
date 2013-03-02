@@ -83,7 +83,7 @@ constant blocksize = 1024
 
 include std/io.e
 
-seek(fn, sections[1][SECTION_POFFSET])
+/*seek(fn, sections[1][SECTION_POFFSET])
 object buf
 for i = 1 to floor((sections[1][SECTION_PSIZE]+blocksize-1)/blocksize) do
     buf = get_bytes(fn,blocksize)
@@ -110,7 +110,7 @@ for i = 1 to floor((sections[1][SECTION_PSIZE]+blocksize-1)/blocksize) do
             j+=1
         end while
     end if
-end for
+end for*/
 
 close(fn)
 
