@@ -11,6 +11,12 @@ constant df = "..\\Dwarf Fortress.exe"
 
 atom fn = open_pe(df)
 
+if fn<0 then
+    puts(1,"File not found.\n")
+    any_key()
+    abort(1)
+end if
+
 constant pe_header = check_pe(fn) -- todo: проверка валидности
 global constant
     image_base = fpeek4u(fn, pe_header+PE_IMAGE_BASE),
