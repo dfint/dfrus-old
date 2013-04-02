@@ -7,6 +7,11 @@ include disasm.e
 include patcher.e
 
 atom fn = open("d:\\Games\\df_34_11_win\\Dwarf Fortress.exe","ub")
+if fn<0 then
+    puts(1,"File not found.\n")
+    any_key()
+    abort(1)
+end if
 
 constant
     pe_header = check_pe(fn),

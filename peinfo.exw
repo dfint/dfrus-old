@@ -9,6 +9,11 @@ include patcher.e
 
 -- atom fn = open("d:\\Games\\df_34_09_win\\Dwarf Fortress.exe","rb")
 atom fn = open("d:\\Games\\df_34_11_win\\Dwarf Fortress Rus.exe","ub")
+if fn<0 then
+    puts(1,"File not found.\n")
+    any_key()
+    abort()
+end if
 constant header = check_pe(fn)
 
 seek(fn,header)
