@@ -8,6 +8,11 @@ include elf.e
 include patcher.e
 
 atom fn = open("d:\\Games\\df_linux\\libs\\Dwarf_Fortress","rb")
+if fn<0 then
+    puts(1,"File not found.\n")
+    any_key()
+    abort(1)
+end if
 constant header = check_header(fn)
 
 seek(fn,header)
