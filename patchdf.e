@@ -56,6 +56,12 @@ function load_trans_file(sequence fname)
     return trans
 end function
 
+ifdef debug then
+    -- pass
+elsedef
+    constant debug = 0
+end ifdef
+
 public
 function load_trans_file_to_map(sequence fname)
     object line
@@ -610,6 +616,6 @@ end function
 
 -- "петля" кода
 public
-procedure stitch(fn,)
+procedure stitch(integer fn, atom offset, atom src, atom dest)
     
 end procedure

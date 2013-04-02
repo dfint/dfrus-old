@@ -93,7 +93,7 @@ end if
 
 pe_header = check_pe(fn)
 if pe_header < 0 then
-    printf(1,"Failed. \"%s\" is not an executable file.")
+    printf(1,"Failed. \"%s\" is not an executable file.",{df2})
     close(fn)
     delete_file(df2)
     any_key()
