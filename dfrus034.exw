@@ -37,7 +37,7 @@ atom fn, pe_header
 constant DF_0_34_01_SDL_stamp = #4F391A33 -- Value got from http://dwarffortresswiki.org/index.php/DF2012:Memory_hacking
 fn = open_pe(df1)
 if fn < 0 then
-    printf(1,"\nUnable to open \"%s\"\n",{df1})
+    printf(1,"Unable to open \"%s\"\n",{df1})
     any_key()
     abort(1)
 end if
