@@ -4,6 +4,7 @@ include std/os.e
 include std/pretty.e
 include std/sequence.e
 include std/io.e
+include std/console.e
 
 include pe.e
 
@@ -101,8 +102,14 @@ constant minlen = 4
 atom initial_offset, max_offset
 sequence sections
 
-puts(1,"Please wait...\n")
 atom fn = open(dfexe,"rb")
+if fn<0 then
+    puts(1,"File not found.\n")
+    any_key()
+    abort(1)
+end if
+
+puts(1,"Please wait...\n")
 sections = get_section_table(fn)
 initial_offset = sections[2][SECTION_POFFSET]
 max_offset = initial_offset + sections[2][SECTION_PSIZE] - 1
