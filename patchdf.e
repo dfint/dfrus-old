@@ -271,7 +271,7 @@ function fix_len(atom fn, atom off, integer oldlen, integer len)
                              (pre[$-7]=LEA and and_bits(pre[$-6],#F8)=glue_triads(2,reg,0)) or -- lea modrm disp32
                              (pre[$-8]=LEA and pre[$-7]=glue_triads(2,reg,4))) and -- lea modrm sib disp32
                         not  (pre[$-3]=MOV_REG_RM+1 and and_bits(pre[$-2],#F8)=glue_triads(3,reg,0)) then -- mov reg1, reg2
-                    -- // возможно нужно всего лишь проверять чтобы перед push был jmp //
+                    -- @TODO: Упростить это условие!!! возможно нужно всего лишь проверять чтобы перед push был jmp
                     -- Возвращаем адрес команды перехода, маш. код указания длины строки и старый адрес перехода:
                     return {oldnext, {POP_REG+reg, PUSH_IMM8, len}, next}
                 end if
