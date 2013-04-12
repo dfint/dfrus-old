@@ -8,7 +8,7 @@ wget -B http://www.dfwk.ru/User:Insolor/translation/ -i transparts.lst -O - | ^
 iconv -c -f utf-8 -t cp1251 | ^
 eui processwiki >> trans.txt
 
-echo ==================================== Downloading speech files:====================================
-wget http://www.dfwk.ru/Служебная:Export/User:Insolor/translation/speech -O - | ^
-iconv -c -f utf-8 -t cp1251 | ^
-eui procspeech data\speech
+REM echo ==================================== Downloading speech files:====================================
+REM wget http://www.dfwk.ru/Служебная:Export/User:Insolor/translation/speech -O - | ^
+REM iconv -c -f utf-8 -t cp1251 | ^
+REM eui procspeech data\speech
