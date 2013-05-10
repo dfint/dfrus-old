@@ -234,29 +234,37 @@ for i = 1 to length(strings) do
         -- »справить длину строки:
         object fix = fix_len(fn, refs[j], length(strings[i][2]), length(translation))
         if sequence(fix) then -- не удалось исправить длину по причине джампа
-            -- ‘ункци€ fix_len наткнулась на jmp и вернула машинный код указани€ длины и адрес перехода
-            -- {src, mach, dest} = fix
-            integer src = fix[1]
-            sequence mach = fix[2]
-            integer dest = fix[3]
-            
-            integer
-                stitch_off = new_sect_off,
-                stitch_rva = off_to_rva_ex(stitch_off, new_section),
-                dest_rva = off_to_rva_ex(dest, sections[1]),
-                disp = dest_rva-(stitch_rva+length(mach)+5), -- смещение перехода из петли
-                src_rva = off_to_rva_ex(src, sections[1])
-            
-            mach &= JMP_NEAR & int_to_bytes(disp) -- добавл€ем выход из петли в нужное место
-            -- ѕрописываем код петли в новую секцию:
-            new_sect_off = add_to_new_section(fn, new_sect_off, mach) 
-            -- aligned = align(length(mach))
-            -- fpoke(fn, stitch_off, pad_tail(mach, aligned, 0))
-            -- new_sect_off += aligned
-            disp = stitch_rva-(src_rva+5)
-            fpoke4(fn, src+1, disp) -- делаем переход на петлю
-            if debug then
-                printf(1,"Added stitch at #%x for |%s|%s|\n",{src_rva+image_base, strings[i][2],translation})
+            if length(fix)<3 then
+                if debug then
+                    printf(1,"Unable to add stitch at #%x for |%s|%s| (short jump)\n",
+                        {off_to_rva_ex(refs[j],sections[1])+image_base, strings[i][2],translation})
+                end if
+            else
+                -- ‘ункци€ fix_len наткнулась на jmp и вернула машинный код указани€ длины и адрес перехода
+                -- {src, mach, dest} = fix
+                integer src = fix[1]
+                sequence mach = fix[2]
+                integer dest = fix[3]
+                
+                integer
+                    stitch_off = new_sect_off,
+                    stitch_rva = off_to_rva_ex(stitch_off, new_section),
+                    dest_rva = off_to_rva_ex(dest, sections[1]),
+                    disp = dest_rva-(stitch_rva+length(mach)+5), -- смещение перехода из петли
+                    src_rva = off_to_rva_ex(src, sections[1])
+                
+                mach &= JMP_NEAR & int_to_bytes(disp) -- добавл€ем выход из петли в нужное место
+                -- ѕрописываем код петли в новую секцию:
+                new_sect_off = add_to_new_section(fn, new_sect_off, mach) 
+                -- aligned = align(length(mach))
+                -- fpoke(fn, stitch_off, pad_tail(mach, aligned, 0))
+                -- new_sect_off += aligned
+                disp = stitch_rva-(src_rva+5)
+                fpoke4(fn, src+1, disp) -- делаем переход на петлю
+                if debug then
+                    printf(1,"Added stitch at #%x for |%s|%s|\n",
+                        {src_rva+image_base, strings[i][2],translation})
+                end if
             end if
         elsif fix != 0 then -- ”далось исправить длину, или исправление не требуетс€
             if fix = -2 and debug then -- не удалось исправить длину, но скорее всего нужно
@@ -323,8 +331,7 @@ for i = 1 to length(strings) do
                     if debug then
                         printf(1,"|%s|%s| <- %x (%x)\n",
                             {strings[i][2], translation} & refs[j] & ( off_to_rva_ex(refs[j], sections[1])+image_base ) )
-                        printf(1, "Failed to fix relocations (Returned #%x).\n",mod_reloc)
-                        puts(1,"Rolling back.\n")
+                        printf(1, "Failed to fix relocations (Returned #%x). Rolling back.\n",mod_reloc)
                     end if
                 end if
             elsif debug then
