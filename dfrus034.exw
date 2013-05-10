@@ -232,28 +232,26 @@ for i = 1 to length(strings) do
     for j = 1 to length(s) do
         -- »справить длину строки:
         object fix = fix_len(fn, s[j], length(strings[i][2]), length(translation))
-        if sequence(fix) then -- ‘ункци€ fix_len наткнулась на jmp и вернула машинный код указани€ длины и адрес перехода
+        if sequence(fix) then
+            -- ‘ункци€ fix_len наткнулась на jmp и вернула машинный код указани€ длины и адрес перехода
             integer oldnext = fix[1]
-            sequence mach_stitch = fix[2] & JMP_NEAR -- заготовка дл€ петли
+            sequence mach_stitch = fix[2]
             integer next = fix[3]
             integer
                 stitch_off = new_sect_off,
                 stitch_rva = off_to_rva_ex(stitch_off, new_section),
                 dest_rva = off_to_rva_ex(next, sections[1]),
-                disp = dest_rva-(stitch_rva+length(mach_stitch)+4), -- смещение перехода из петли
-                src_rva = off_to_rva_ex(oldnext, sections[1])+5 -- 
+                disp = dest_rva-(stitch_rva+length(mach_stitch)+5), -- смещение перехода из петли
+                src_rva = off_to_rva_ex(oldnext, sections[1])+5
             
-            mach_stitch &= int_to_bytes(disp)
+            mach_stitch &= JMP_NEAR & int_to_bytes(disp) -- добавл€ем выход из петли в нужное место
             aligned = align(length(mach_stitch))
-
-            fpoke(fn, stitch_off, pad_tail(mach_stitch, aligned, 0)) -- добавл€ем код в новую секцию
+            fpoke(fn, stitch_off, pad_tail(mach_stitch, aligned, 0)) -- добавл€ем код петли в новую секцию
             
             disp = stitch_rva-src_rva
-            fpoke4(fn, oldnext+1, disp) -- исправл€ем 
+            fpoke4(fn, oldnext+1, disp) -- делаем переход на петлю
+            
             new_sect_off += aligned
-            -- fix[2] = mach_stitch
-            -- print(1,fix)
-            -- puts(1,'\n')
         elsif fix != 0 then -- ”далось исправить длину, или исправление не требуетс€
             if fix = -2 and debug then -- не удалось исправить длину, но скорее всего нужно
                 printf(1,"|%s|%s| <- %x (%x)\n",
@@ -273,9 +271,9 @@ for i = 1 to length(strings) do
             
             if sequence(x) then
                 -- ѕолучаем машинный код, копирующий строку:
-                sequence mach = mach_memcpy(off_to_rva_ex(str_off, new_section)+image_base, x[2],
-                                                                            length(translation)+1)
-                integer new_ref_off = mach[$]
+                integer src = off_to_rva_ex(str_off, new_section)+image_base
+                sequence mach = mach_memcpy(src, x[2], length(translation)+1)
+                integer new_ref_off = mach[$] -- относительное положение ссылки внутри сгенерированного кода
                 mach = mach[1..$-1]
                 -- ƒобавл€ем в машинный код затираемое lea, т.к. значение может использоватьс€ ниже по коду:
                 if sequence(x[4]) then
@@ -285,20 +283,25 @@ for i = 1 to length(strings) do
                 integer new_ref -- јдрес новой ссылки
                 if length(mach) > x[1] then
                     -- ѕолученный машинный код не умещаетс€ на первоначальное место
-                    -- ѕрописываем его в отдельную секцию
-                    -- mach &= RET_NEAR -- ѕревращаем сгенерированный код в процедуру
-                    -- fpoke(fn, new_sect_off, mach)
-                    -- aligned = align(length(mach))
-                    -- -- ѕо первоначальному местоположению копирующего кода пропишем вызов процедуры
-                    -- mach = CALL_NEAR & int_to_bytes(new_ref_off-(start+5))
-                    -- new_ref = off_to_rva_ex(new_sect_off, new_section)+new_ref_off
-                    -- new_sect_off += aligned
-                    if debug then
-                        printf(1,"|%s|%s| <- %x (%x)\n",
-                            {strings[i][2], translation} & s[j] & ( off_to_rva_ex(s[j], sections[1])+image_base ) )
-                        printf(1, "Mach code is too long (%d against %d).\n",{length(mach),x[1]})
+                    sequence proc = mach & RET_NEAR -- ѕревращаем сгенерированный код в процедуру
+                    integer dest_off = new_sect_off,
+                            dest_rva = off_to_rva_ex(dest_off, new_section)
+                    -- ѕо первоначальному местоположению копирующего кода пропишем вызов процедуры
+                    integer disp = dest_rva-(start_rva+5)
+                    mach = CALL_NEAR & int_to_bytes(disp)
+                    if length(mach) > x[1] then -- 5 > x[1]
+                        if debug then
+                            printf(1,"|%s|%s| <- %x (%x)\n",
+                                {strings[i][2], translation} & s[j] & ( off_to_rva_ex(s[j], sections[1])+image_base ) )
+                            printf(1, "Mach code is too long (%d against %d).\n",{length(mach),x[1]})
+                        end if
+                        continue -- полученный машинный код не уместилс€
                     end if
-                    continue -- полученный машинный код не уместилс€
+                    fpoke(fn, dest_off, proc) -- ѕрописываем код процедуры в новую секцию
+                    aligned = align(length(proc))
+                    printf(1,"#%x\n",start_rva+image_base)
+                    new_ref =dest_rva+new_ref_off
+                    new_sect_off += aligned
                 else
                     new_ref = start_rva+new_ref_off
                 end if
