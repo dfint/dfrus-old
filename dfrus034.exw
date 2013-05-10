@@ -199,15 +199,15 @@ for i = 1 to length(strings) do
     end if
     -- Поиск строки в таблице объектов:
     integer k = binary_search(strings[i][1], objs)
-    sequence s = xrefs[k] -- список ссылок на данную строку
+    sequence refs = xrefs[k] -- список ссылок на данную строку
     
     -- Находим ссылки на середину строки
     integer l = 1
     while objs[k+l]-strings[i][1] < length(strings[i][2])+1 do
-        for j = 1 to length(s) do
-            integer delta =  s[j] - xrefs[k+l][1]
+        for j = 1 to length(refs) do
+            integer delta =  refs[j] - xrefs[k+l][1]
             if length(xrefs[k+l]) = 1 and delta>0 and delta<=6 then
-                s[j] = xrefs[k+l][1]
+                refs[j] = xrefs[k+l][1]
             end if
         end for
         l += 1
@@ -222,41 +222,72 @@ for i = 1 to length(strings) do
         aligned = 0
     else
         -- Если строка длинная, то записать ее в специально отведенную для этого секцию:
-        aligned = align(length(translation)+1)
-        fpoke(fn, new_sect_off, pad_tail(translation, aligned, 0))
         str_off = new_sect_off
-        new_sect_off += aligned
+        -- aligned = align(length(translation)+1)
+        -- fpoke(fn, str_off, pad_tail(translation, aligned, 0))
+        -- new_sect_off += aligned
+        new_sect_off = add_to_new_section(fn, new_sect_off, translation & 0)
     end if
     
     -- Исправляем длину строк по каждой из ссылок на нее
-    for j = 1 to length(s) do
+    for j = 1 to length(refs) do
         -- Исправить длину строки:
-        object fix = fix_len(fn, s[j], length(strings[i][2]), length(translation))
-        if sequence(fix) then -- Функция наткнулась на jmp и вернула машинный код указания длины и адрес перехода
-            -- integer disp = 
-            
+        object fix = fix_len(fn, refs[j], length(strings[i][2]), length(translation))
+        if sequence(fix) then -- не удалось исправить длину по причине джампа
+            if length(fix)<3 then
+                if debug then
+                    printf(1,"Unable to add stitch at #%x for |%s|%s| (short jump)\n",
+                        {off_to_rva_ex(refs[j],sections[1])+image_base, strings[i][2],translation})
+                end if
+            else
+                -- Функция fix_len наткнулась на jmp и вернула машинный код указания длины и адрес перехода
+                -- {src, mach, dest} = fix
+                integer src = fix[1]
+                sequence mach = fix[2]
+                integer dest = fix[3]
+                
+                integer
+                    stitch_off = new_sect_off,
+                    stitch_rva = off_to_rva_ex(stitch_off, new_section),
+                    dest_rva = off_to_rva_ex(dest, sections[1]),
+                    disp = dest_rva-(stitch_rva+length(mach)+5), -- смещение перехода из петли
+                    src_rva = off_to_rva_ex(src, sections[1])
+                
+                mach &= JMP_NEAR & int_to_bytes(disp) -- добавляем выход из петли в нужное место
+                -- Прописываем код петли в новую секцию:
+                new_sect_off = add_to_new_section(fn, new_sect_off, mach) 
+                -- aligned = align(length(mach))
+                -- fpoke(fn, stitch_off, pad_tail(mach, aligned, 0))
+                -- new_sect_off += aligned
+                disp = stitch_rva-(src_rva+5)
+                fpoke4(fn, src+1, disp) -- делаем переход на петлю
+                if debug then
+                    printf(1,"Added stitch at #%x for |%s|%s|\n",
+                        {src_rva+image_base, strings[i][2],translation})
+                end if
+            end if
         elsif fix != 0 then -- Удалось исправить длину, или исправление не требуется
             if fix = -2 and debug then -- не удалось исправить длину, но скорее всего нужно
                 printf(1,"|%s|%s| <- %x (%x)\n",
-                    {strings[i][2], translation} & s[j] & ( off_to_rva_ex(s[j], sections[1])+image_base ) )
-                puts(1, "SUSPICIOUS: Failed to fix length.\n")
+                    {strings[i][2], translation} & refs[j] & ( off_to_rva_ex(refs[j], sections[1])+image_base ) )
+                puts(1, "SUSPICIOUS: Failed to fix length.\n") -- скорее всего код поломался
             end if
             if long then -- Если строка длинная, то исправить ссылку на строку в коде:
-                fpoke4(fn, s[j], off_to_rva_ex(str_off, new_section)+image_base)
+                fpoke4(fn, refs[j], off_to_rva_ex(str_off, new_section)+image_base)
             end if
         elsif long then -- Если не удалось исправить длину:
             -- Считываем 3 байта перед ссылкой для нахождения начала копирующего кода
-            sequence pre = fpeek(fn, {s[j]-3, 3})
+            sequence pre = fpeek(fn, {refs[j]-3, 3})
             -- Находим начало копирующего кода:
-            integer start = s[j]-get_start(pre)
+            integer start = refs[j]-get_start(pre)
             -- Получаем длину кода, копирующего строку:
             object x = get_length( fpeek(fn, {start, 100}), length(strings[i][2])+1)
             
             if sequence(x) then
                 -- Получаем машинный код, копирующий строку:
-                sequence mach = mach_memcpy(off_to_rva_ex(str_off, new_section)+image_base, x[2],
-                                                                            length(translation)+1)
-                integer new_ref_off = mach[$]
+                integer src = off_to_rva_ex(str_off, new_section)+image_base
+                sequence mach = mach_memcpy(src, x[2], length(translation)+1)
+                integer new_ref_off = mach[$] -- относительное положение ссылки внутри сгенерированного кода
                 mach = mach[1..$-1]
                 -- Добавляем в машинный код затираемое lea, т.к. значение может использоваться ниже по коду:
                 if sequence(x[4]) then
@@ -266,37 +297,47 @@ for i = 1 to length(strings) do
                 integer new_ref -- Адрес новой ссылки
                 if length(mach) > x[1] then
                     -- Полученный машинный код не умещается на первоначальное место
-                    -- Прописываем его в отдельную секцию
-                    -- mach &= RET_NEAR -- Превращаем сгенерированный код в процедуру
-                    -- fpoke(fn, new_sect_off, mach)
-                    -- aligned = align(length(mach))
-                    -- -- По первоначальному местоположению копирующего кода пропишем вызов процедуры
-                    -- mach = CALL_NEAR & int_to_bytes(new_ref_off-(start+5))
-                    -- new_ref = off_to_rva_ex(new_sect_off, new_section)+new_ref_off
-                    -- new_sect_off += aligned
-                    if debug then
-                        printf(1,"|%s|%s| <- %x (%x)\n",
-                            {strings[i][2], translation} & s[j] & ( off_to_rva_ex(s[j], sections[1])+image_base ) )
-                        printf(1, "Mach code is too long (%d against %d).\n",{length(mach),x[1]})
+                    sequence proc = mach & RET_NEAR -- Превращаем сгенерированный код в процедуру
+                    integer dest_off = new_sect_off,
+                            dest_rva = off_to_rva_ex(dest_off, new_section)
+                    -- По первоначальному местоположению копирующего кода пропишем вызов процедуры
+                    integer disp = dest_rva-(start_rva+5)
+                    mach = CALL_NEAR & int_to_bytes(disp)
+                    if length(mach) > x[1] then -- 5 > x[1]
+                        if debug then
+                            printf(1,"|%s|%s| <- %x (%x)\n",
+                                {strings[i][2], translation} & refs[j] & ( off_to_rva_ex(refs[j], sections[1])+image_base ) )
+                            printf(1, "Mach code is too long (%d against %d).\n",{length(mach),x[1]})
+                        end if
+                        continue -- полученный машинный код не уместился
                     end if
-                    continue -- полученный машинный код не уместился
+                    -- fpoke(fn, dest_off, proc)
+                    -- aligned = align(length(proc))
+                    -- new_sect_off += aligned
+                    -- Прописываем код процедуры в новую секцию:
+                    new_sect_off = add_to_new_section(fn, dest_off, proc)
+                    new_ref = dest_rva+new_ref_off
                 else
                     new_ref = start_rva+new_ref_off
                 end if
                 mach = pad_tail(mach, x[1], NOP) -- добиваем освободившиеся байты пустыми командами
+                sequence bak_mach = fpeek(fn, {start,x[1]}) -- сохраняем затираемые байты
                 fpoke(fn, start, mach) -- патчим код!
                 -- Исправляем битые релокации --
                 x[3] += start_rva-1 -- получаем адреса удаленных ссылок
                 integer mod_reloc = modify_relocations(fn, sections, (-x[3]) & new_ref)
                 if mod_reloc != 0 and debug then
-                    printf(1,"|%s|%s| <- %x (%x)\n",
-                        {strings[i][2], translation} & s[j] & ( off_to_rva_ex(s[j], sections[1])+image_base ) )
-                    printf(1, "Failed to fix relocations (Error code %d).\n",mod_reloc)
+                    fpoke(fn, start, bak_mach) -- rolling back
+                    if debug then
+                        printf(1,"|%s|%s| <- %x (%x)\n",
+                            {strings[i][2], translation} & refs[j] & ( off_to_rva_ex(refs[j], sections[1])+image_base ) )
+                        printf(1, "Failed to fix relocations (Returned #%x). Rolling back.\n",mod_reloc)
+                    end if
                 end if
             elsif debug then
                 printf(1,"|%s|%s| <- %x (%x)\n",
-                    {strings[i][2], translation} & s[j] & ( off_to_rva_ex(s[j], sections[1])+image_base ) )
-                printf(1,"Failed to obtain copying code length (Error code %d).\n",x)
+                    {strings[i][2], translation} & refs[j] & ( off_to_rva_ex(refs[j], sections[1])+image_base ) )
+                printf(1,"Failed to obtain copying code length (Returned %d).\n",x)
             end if
         end if
     end for
