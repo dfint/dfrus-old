@@ -223,9 +223,6 @@ for i = 1 to length(strings) do
     else
         -- ≈сли строка длинна€, то записать ее в специально отведенную дл€ этого секцию:
         str_off = new_sect_off
-        -- aligned = align(length(translation)+1)
-        -- fpoke(fn, str_off, pad_tail(translation, aligned, 0))
-        -- new_sect_off += aligned
         new_sect_off = add_to_new_section(fn, new_sect_off, translation & 0)
     end if
     
@@ -256,9 +253,6 @@ for i = 1 to length(strings) do
                 mach &= JMP_NEAR & int_to_bytes(disp) -- добавл€ем выход из петли в нужное место
                 -- ѕрописываем код петли в новую секцию:
                 new_sect_off = add_to_new_section(fn, new_sect_off, mach) 
-                -- aligned = align(length(mach))
-                -- fpoke(fn, stitch_off, pad_tail(mach, aligned, 0))
-                -- new_sect_off += aligned
                 disp = stitch_rva-(src_rva+5)
                 fpoke4(fn, src+1, disp) -- делаем переход на петлю
                 if debug then
@@ -311,9 +305,6 @@ for i = 1 to length(strings) do
                         end if
                         continue -- полученный машинный код не уместилс€
                     end if
-                    -- fpoke(fn, dest_off, proc)
-                    -- aligned = align(length(proc))
-                    -- new_sect_off += aligned
                     -- ѕрописываем код процедуры в новую секцию:
                     new_sect_off = add_to_new_section(fn, dest_off, proc)
                     new_ref = dest_rva+new_ref_off
