@@ -233,22 +233,27 @@ for i = 1 to length(strings) do
         -- Исправить длину строки:
         object fix = fix_len(fn, s[j], length(strings[i][2]), length(translation))
         if sequence(fix) then -- Функция fix_len наткнулась на jmp и вернула машинный код указания длины и адрес перехода
+            integer oldnext = fix[1]
             sequence mach_stitch = fix[2] & JMP_NEAR -- заготовка для петли
+            integer next = fix[3]
             integer
                 stitch_off = new_sect_off,
                 stitch_rva = off_to_rva_ex(stitch_off, new_section),
-                dest_rva = off_to_rva_ex(fix[3], sections[1]),
-                disp = stitch_rva+length(mach_stitch)+4-dest_rva,
-                src_rva = off_to_rva_ex(fix[1]+5, sections[1])
+                dest_rva = off_to_rva_ex(next, sections[1]),
+                disp = dest_rva-(stitch_rva+length(mach_stitch)+4), -- смещение перехода из петли
+                src_rva = off_to_rva_ex(oldnext, sections[1])+5 -- 
             
             mach_stitch &= int_to_bytes(disp)
             aligned = align(length(mach_stitch))
-            fpoke(fn, stitch_off, pad_tail(mach_stitch, aligned, 0))
+
+            fpoke(fn, stitch_off, pad_tail(mach_stitch, aligned, 0)) -- добавляем код в новую секцию
             
             disp = stitch_rva-src_rva
-            
-            print(1,fix)
-            puts(1,'\n')
+            fpoke4(fn, oldnext+1, disp) -- исправляем 
+            new_sect_off += aligned
+            -- fix[2] = mach_stitch
+            -- print(1,fix)
+            -- puts(1,'\n')
         elsif fix != 0 then -- Удалось исправить длину, или исправление не требуется
             if fix = -2 and debug then -- не удалось исправить длину, но скорее всего нужно
                 printf(1,"|%s|%s| <- %x (%x)\n",
