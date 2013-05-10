@@ -300,20 +300,25 @@ for i = 1 to length(strings) do
                     fpoke(fn, dest_off, proc) -- ѕрописываем код процедуры в новую секцию
                     aligned = align(length(proc))
                     printf(1,"#%x\n",start_rva+image_base)
-                    new_ref =dest_rva+new_ref_off
+                    new_ref = dest_rva+new_ref_off
                     new_sect_off += aligned
                 else
                     new_ref = start_rva+new_ref_off
                 end if
                 mach = pad_tail(mach, x[1], NOP) -- добиваем освободившиес€ байты пустыми командами
+                sequence bak_mach = fpeek(fn, {start,x[1]}) -- сохран€ем затираемые байты
                 fpoke(fn, start, mach) -- патчим код!
                 -- »справл€ем битые релокации --
                 x[3] += start_rva-1 -- получаем адреса удаленных ссылок
                 integer mod_reloc = modify_relocations(fn, sections, (-x[3]) & new_ref)
                 if mod_reloc != 0 and debug then
-                    printf(1,"|%s|%s| <- %x (%x)\n",
-                        {strings[i][2], translation} & s[j] & ( off_to_rva_ex(s[j], sections[1])+image_base ) )
-                    printf(1, "Failed to fix relocations (Error code %d).\n",mod_reloc)
+                    fpoke(fn, start, bak_mach) -- rolling back
+                    if debug then
+                        printf(1,"|%s|%s| <- %x (%x)\n",
+                            {strings[i][2], translation} & s[j] & ( off_to_rva_ex(s[j], sections[1])+image_base ) )
+                        printf(1, "Failed to fix relocations (Error code #%x).\n",mod_reloc)
+                        puts(1,"Rolling back.\n")
+                    end if
                 end if
             elsif debug then
                 printf(1,"|%s|%s| <- %x (%x)\n",
