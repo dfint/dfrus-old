@@ -616,8 +616,21 @@ function extract_strings_map(atom fn, map xrefs)
     return strings
 end function
 
--- "петля" кода
+-- "петля" кода в отдельной секции
 public
 procedure stitch(integer fn, atom offset, atom src, atom dest)
+    -- fn - файловый номер
+    -- offset -
+    -- src - откуда переходим в петлю
+    -- dest - куда выходим из петли
     
 end procedure
+
+-- Процедура добавления чего-либо в новую секцию с выравниванием и добиванием нулями
+public
+function add_to_new_section(integer fn, atom dest, sequence s, integer alignment = 4)
+    integer aligned = align(length(s),alignment)
+    s = pad_tail(s,aligned,0)
+    fpoke(fn,dest,s)
+    return dest + aligned
+end function
