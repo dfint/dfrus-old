@@ -223,7 +223,7 @@ function fix_len(atom fn, atom off, integer oldlen, integer len)
                 if jmp then
                     if jmp = JMP_NEAR then
                         -- Возвращаем адрес команды перехода, маш. код указания длины строки и новый адрес перехода:
-                        return {oldnext, {PUSH_IMM8, len}, next+2}
+                        return {oldnext, {PUSH_IMM8, len}, next+2} -- push len8
                     else
                         return -1 -- короткий переход, невозможно добавить "петлю"
                     end if
@@ -239,9 +239,11 @@ function fix_len(atom fn, atom off, integer oldlen, integer len)
                 if jmp then
                     if jmp = JMP_NEAR then
                         -- Возвращаем адрес команды перехода, маш. код указания длины строки и старый адрес перехода:
-                        return {oldnext, (MOV_REG_IMM + 8 + EDI) & int_to_bytes(len), next+5}
+                        return {oldnext,
+                            (MOV_REG_IMM + 8 + EDI) & int_to_bytes(len), -- mov edi, len32
+                            next+5}
                     else
-                        return -1 -- короткий переход, невозможно добавить "петлю"
+                        return {} -- короткий переход, невозможно добавить "петлю"
                     end if
                 end if
                 fpoke4(fn, next+1, len)
@@ -271,9 +273,9 @@ function fix_len(atom fn, atom off, integer oldlen, integer len)
                              (pre[$-7]=LEA and and_bits(pre[$-6],#F8)=glue_triads(2,reg,0)) or -- lea modrm disp32
                              (pre[$-8]=LEA and pre[$-7]=glue_triads(2,reg,4))) and -- lea modrm sib disp32
                         not  (pre[$-3]=MOV_REG_RM+1 and and_bits(pre[$-2],#F8)=glue_triads(3,reg,0)) then -- mov reg1, reg2
-                    -- // возможно нужно всего лишь проверять чтобы перед push был jmp //
+                    -- @TODO: Упростить это условие!!! возможно нужно всего лишь проверять чтобы перед push был jmp
                     -- Возвращаем адрес команды перехода, маш. код указания длины строки и старый адрес перехода:
-                    return {oldnext, {POP_REG+reg, PUSH_IMM8, len}, next}
+                    return {oldnext, {POP_REG+reg, PUSH_IMM8, len}, next} -- pop REG \\ push len
                 end if
             end if
         elsif reg = ESI then -- mov esi, offset str
@@ -614,8 +616,21 @@ function extract_strings_map(atom fn, map xrefs)
     return strings
 end function
 
--- "петля" кода
+-- "петля" кода в отдельной секции
 public
 procedure stitch(integer fn, atom offset, atom src, atom dest)
+    -- fn - файловый номер
+    -- offset -
+    -- src - откуда переходим в петлю
+    -- dest - куда выходим из петли
     
 end procedure
+
+-- Процедура добавления чего-либо в новую секцию с выравниванием и добиванием нулями
+public
+function add_to_new_section(integer fn, atom dest, sequence s, integer alignment = 4)
+    integer aligned = align(length(s),alignment)
+    s = pad_tail(s,aligned,0)
+    fpoke(fn,dest,s)
+    return dest + aligned
+end function
