@@ -23,39 +23,6 @@ procedure patch_unicode_table(atom fn, atom off)
     fpoke4(fn, off+'А'*4, cyr)
 end procedure
 
--- DEPRECATED: не используется в текущей версии, требует явного указания смещения.
-public
-function load_trans_file(sequence fname)
-    object line
-    sequence x, off, trans = {}
-    atom fn = open(fname, "r")
-    if fn < 0 then
-        return -1
-    end if
-    while 1 do
-        line = gets(fn)
-        if atom(line) then
-            exit
-        end if
-        x = split(line, '|')
-        if length(x)>3 then
-            off = value('#' & x[1])
-            if off[1] = GET_SUCCESS then
-                x[1] = off[2]
-                x[2] = match_replace("\\r", x[2], "\r")
-                x[3] = match_replace("\\r", x[3], "\r")
-                if length(trans)=0 or x[1]>trans[$][1] then
-                    trans = append(trans,x)
-                else
-                    -- todo: вставлять в нужное место
-                end if
-            end if
-        end if
-    end while
-    close(fn)
-    return trans
-end function
-
 ifdef debug then
     -- pass
 elsedef
