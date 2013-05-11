@@ -189,9 +189,6 @@ function fix_len(atom fn, atom off, integer oldlen, integer len)
     integer r, reg
     integer jmp = 0
     
-    -- По поводу нижеследующего ифа: можно проверять, не идет ли по безусловному переходу инструкция,
-    -- указывающая длину строки, и если да, то переход на код, прописывающий нужную длину, а потом переход
-    -- на код идущий после кода указывающего старую длину
     if aft[1] = JMP_SHORT or aft[1] = JMP_NEAR then
         integer disp -- смещение jmp
         oldnext = next
