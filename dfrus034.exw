@@ -106,11 +106,11 @@ constant
 
 -- ѕолучаем адреса всех перемещаемых элементов:
 sequence
-    relocs = get_relocations(fn,sections),
+    relocs = get_relocations(fn,sections)
+
 -- ѕолучаем перекрЄстные ссылки:
-    xref_table = get_cross_references(fn,relocs,sections,image_base), -- @todo: заменить на get_cross_references_to_map()
-    objs  = xref_table[1],
-    xrefs = xref_table[2]
+object xref_map = get_cross_references_to_map(fn,relocs,sections,image_base)
+sequence objs = keys(xref_map, 1) -- отсортированный список ключей
 
 -----------------------------------------------------------------------------
 puts(1,"Enabling the cyrillic alphabet...\n")
@@ -119,15 +119,16 @@ puts(1,"Enabling the cyrillic alphabet...\n")
 constant unicode_table_start = { #20, #263A, #263B, #2665, #2666, #2663, #2660, #2022 }
 
 -- Ќаходим таблицу перекодировки:
-atom off = 0
-sequence buf
-for i = 1 to length(objs) do
-    buf = fpeek4u(fn, {objs[i],length(unicode_table_start)})
-    if equal(buf, unicode_table_start) then
-        off = objs[i]
-        exit
+function find_unicode_table(object key, object val, object user_data, integer progress_code)
+    sequence buf = fpeek4u(user_data[1], {key, length(user_data[2])})
+    if equal(buf, user_data[2]) then
+        return key
+    else
+        return 0
     end if
-end for
+end function
+
+atom off = map:for_each(xref_map, routine_id("find_unicode_table"), {fn, unicode_table_start})
 
 if not off then
     close(fn)
@@ -186,39 +187,43 @@ if debug then
     end if
 end if
 
+constant OFF = 1, STR = 2
 for i = 1 to length(strings) do
-    object translation = map:get(trans, strings[i][2])
+    object translation = map:get(trans, strings[i][STR])
     if atom(translation) then
         -- if debug then
-            -- printf(1,"Translation not found for \"%s\".\n", {strings[i][2]})
+            -- printf(1,"Translation not found for \"%s\".\n", {strings[i][STR]})
         -- end if
         continue -- перевод не найден
     end if
-    if equal(strings[i][2], translation) then
+    if equal(strings[i][STR], translation) then
         continue -- перевод равен оригиналу
     end if
+    
     -- ѕоиск строки в таблице объектов:
-    integer k = binary_search(strings[i][1], objs)
-    sequence refs = xrefs[k] -- список ссылок на данную строку
+    integer k = binary_search(strings[i][OFF], objs)
+    sequence refs = map:get(xref_map, strings[i][OFF]) -- список ссылок на данную строку
     
     -- Ќаходим ссылки на середину строки
+    -- что это и как работает ???
     integer l = 1
-    while objs[k+l]-strings[i][1] < length(strings[i][2])+1 do
+    while objs[k+l]-strings[i][OFF] < length(strings[i][STR])+1 do
         for j = 1 to length(refs) do
-            integer delta =  refs[j] - xrefs[k+l][1]
-            if length(xrefs[k+l]) = 1 and delta>0 and delta<=6 then
-                refs[j] = xrefs[k+l][1]
+            sequence x = map:get(xref_map, objs[k+l])
+            integer delta =  refs[j] - x[1]
+            if length(x[1]) = 1 and delta>0 and delta<=6 then
+                refs[j] = x[1]
             end if
         end for
         l += 1
     end while
     
-    integer aligned_len = align(length(strings[i][2])+1) -- ћаксимальна€ длина "короткой" строки
+    integer aligned_len = align(length(strings[i][STR])+1) -- ћаксимальна€ длина "короткой" строки
     integer long = aligned_len<length(translation)+1
     integer str_off
     if not long then
         -- ≈сли строка достаточно коротка€, то записать ее поверх старой:
-        fpoke(fn, strings[i][1], pad_tail(translation & 0, aligned_len, 0)) -- назадействованные байты заполнить нул€ми
+        fpoke(fn, strings[i][OFF], pad_tail(translation & 0, aligned_len, 0)) -- назадействованные байты заполнить нул€ми
         aligned = 0
     else
         -- ≈сли строка длинна€, то записать ее в специально отведенную дл€ этого секцию:
@@ -229,13 +234,13 @@ for i = 1 to length(strings) do
     -- »справл€ем длину строк по каждой из ссылок на нее
     for j = 1 to length(refs) do
         -- »справить длину строки:
-        object fix = fix_len(fn, refs[j], length(strings[i][2]), length(translation))
+        object fix = fix_len(fn, refs[j], length(strings[i][STR]), length(translation))
         if sequence(fix) then -- не удалось исправить длину по причине джампа
             if length(fix)<3 then
                 if debug then
                     printf(1,"Unable to add stitch at #%x for |%s|%s| (short jump to #%x)\n", {
                         off_to_rva_ex(fix[1],sections[1])+image_base,
-                        strings[i][2],
+                        strings[i][STR],
                         translation,
                         off_to_rva_ex(fix[2],sections[1])+image_base
                     })
@@ -261,7 +266,7 @@ for i = 1 to length(strings) do
                 fpoke4(fn, src+1, disp) -- делаем переход на петлю
                 if debug then
                     printf(1,"Added stitch at #%x for |%s|%s|\n",
-                        {src_rva+image_base, strings[i][2],translation})
+                        {src_rva+image_base, strings[i][STR],translation})
                 end if
             end if
             fix = -1 -- считаем, что длина строки исправлена (даже если наткнулись на short jmp)
@@ -269,7 +274,7 @@ for i = 1 to length(strings) do
         if fix != 0 then -- ”далось исправить длину, или исправление не требуетс€
             if fix = -2 and debug then -- не удалось исправить длину, но скорее всего нужно
                 printf(1,"|%s|%s| <- %x (%x)\n",
-                    {strings[i][2], translation} & refs[j] & ( off_to_rva_ex(refs[j], sections[1])+image_base ) )
+                    {strings[i][STR], translation} & refs[j] & ( off_to_rva_ex(refs[j], sections[1])+image_base ) )
                 puts(1, "SUSPICIOUS: Failed to fix length.\n") -- скорее всего код поломалс€
             end if
             if long then -- ≈сли строка длинна€, то исправить ссылку на строку в коде:
@@ -281,7 +286,7 @@ for i = 1 to length(strings) do
             -- Ќаходим начало копирующего кода:
             integer start = refs[j]-get_start(pre)
             -- ѕолучаем длину кода, копирующего строку:
-            object x = get_length( fpeek(fn, {start, 100}), length(strings[i][2])+1)
+            object x = get_length( fpeek(fn, {start, 100}), length(strings[i][STR])+1)
             
             if sequence(x) then
                 -- ѕолучаем машинный код, копирующий строку:
@@ -306,7 +311,7 @@ for i = 1 to length(strings) do
                     if length(mach) > x[1] then -- 5 > x[1]
                         if debug then
                             printf(1,"|%s|%s| <- %x (%x)\n",
-                                {strings[i][2], translation} & refs[j] & ( off_to_rva_ex(refs[j], sections[1])+image_base ) )
+                                {strings[i][STR], translation} & refs[j] & ( off_to_rva_ex(refs[j], sections[1])+image_base ) )
                             printf(1, "Mach code is too long (%d against %d).\n",{length(mach),x[1]})
                         end if
                         continue -- полученный машинный код не уместилс€
@@ -326,12 +331,12 @@ for i = 1 to length(strings) do
                     fpoke(fn, start, mach)
                 elsif debug then
                     printf(1,"|%s|%s| <- %x (%x)\n",
-                        {strings[i][2], translation} & refs[j] & ( off_to_rva_ex(refs[j], sections[1])+image_base ) )
+                        {strings[i][STR], translation} & refs[j] & ( off_to_rva_ex(refs[j], sections[1])+image_base ) )
                     printf(1, "Failed to fix relocations (Returned #%x).\n",mod_reloc)
                 end if
             elsif debug then
                 printf(1,"|%s|%s| <- %x (%x)\n",
-                    {strings[i][2], translation} & refs[j] & ( off_to_rva_ex(refs[j], sections[1])+image_base ) )
+                    {strings[i][STR], translation} & refs[j] & ( off_to_rva_ex(refs[j], sections[1])+image_base ) )
                 printf(1,"Failed to obtain copying code length (Returned %d).\n",x)
             end if
         end if
