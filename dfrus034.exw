@@ -8,7 +8,7 @@ include std/sequence.e
 include std/map.e
 include std/convert.e
 
--- with trace
+with trace
 include patcher.e
 include pe.e
 include disasm.e
@@ -259,8 +259,10 @@ for i = 1 to length(strings) do
                     printf(1,"Added stitch at #%x for |%s|%s|\n",
                         {src_rva+image_base, strings[i][2],translation})
                 end if
+                fix = -1 -- длина строки исправлена
             end if
-        elsif fix != 0 then -- Удалось исправить длину, или исправление не требуется
+        end if
+        if fix != 0 then -- Удалось исправить длину, или исправление не требуется
             if fix = -2 and debug then -- не удалось исправить длину, но скорее всего нужно
                 printf(1,"|%s|%s| <- %x (%x)\n",
                     {strings[i][2], translation} & refs[j] & ( off_to_rva_ex(refs[j], sections[1])+image_base ) )
