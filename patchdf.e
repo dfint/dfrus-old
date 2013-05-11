@@ -243,7 +243,8 @@ function fix_len(atom fn, atom off, integer oldlen, integer len)
                             (MOV_REG_IMM + 8 + EDI) & int_to_bytes(len), -- mov edi, len32
                             next+5}
                     else
-                        return -1 -- короткий переход, невозможно добавить "петлю" - считаем что так и надо
+                        -- return -1 -- короткий переход, невозможно добавить "петлю" - считаем что так и надо
+                        return {oldnext, next}
                     end if
                 end if
                 fpoke4(fn, next+1, len)

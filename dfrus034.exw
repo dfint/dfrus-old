@@ -233,8 +233,12 @@ for i = 1 to length(strings) do
         if sequence(fix) then -- не удалось исправить длину по причине джампа
             if length(fix)<3 then
                 if debug then
-                    printf(1,"Unable to add stitch at #%x for |%s|%s| (short jump)\n",
-                        {off_to_rva_ex(refs[j],sections[1])+image_base, strings[i][2],translation})
+                    printf(1,"Unable to add stitch at #%x for |%s|%s| (short jump to #%x)\n", {
+                        off_to_rva_ex(fix[1],sections[1])+image_base,
+                        strings[i][2],
+                        translation,
+                        off_to_rva_ex(fix[2],sections[1])+image_base
+                    })
                 end if
             else
                 -- Функция fix_len наткнулась на jmp и вернула машинный код указания длины и адрес перехода
@@ -259,8 +263,8 @@ for i = 1 to length(strings) do
                     printf(1,"Added stitch at #%x for |%s|%s|\n",
                         {src_rva+image_base, strings[i][2],translation})
                 end if
-                fix = -1 -- длина строки исправлена
             end if
+            fix = -1 -- считаем, что длина строки исправлена (даже если наткнулись на short jmp)
         end if
         if fix != 0 then -- Удалось исправить длину, или исправление не требуется
             if fix = -2 and debug then -- не удалось исправить длину, но скорее всего нужно
