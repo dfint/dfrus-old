@@ -56,44 +56,7 @@ function load_trans_file_to_map(sequence fname)
     return trans
 end function
 
--- Утечка памяти при при запуске в скомпилированном виде
 constant code=1, rdata = 2, data = 3
-public
-function get_cross_references(atom fn, sequence relocs, sequence sections, atom image_base)
-    atom obj
-    sequence objs = {}, xrefs = {}
-    integer k
-    for i = 1 to length(relocs) do
-        -- Получаем смещение объекта, на который указывает перемещаемый элемент
-        -- превращаем адрес в смещение и читаем что по этому смещению находится:
-        -- relocs[i] = rva_to_off(relocs[i], sections)
-        relocs[i] -= sections[code][SECTION_RVA]
-        -- Ссылка должна находиться в секции кода:
-        if relocs[i] < 0 or relocs[i]>=sections[code][SECTION_VSIZE] then
-            continue
-        end if
-        relocs[i] += sections[code][SECTION_POFFSET]
-        -- Считываем адрес объекта и преобразуем его в смещение от начала файла:
-        obj = rva_to_off(fpeek4u(fn, relocs[i]) - image_base, sections)
-        -- Проверяем, находится ли адрес в секциях .rdata или .data:
-        if obj >= sections[rdata][SECTION_POFFSET] and obj < sections[data][SECTION_POFFSET]+sections[data][SECTION_PSIZE] then
-            -- Добавляем смещение объекта в сортированную таблицу смещений
-            k = binary_search(obj, objs)
-            if k < 0 then -- Если смещение объекта не найдено, то
-                -- добавить его в таблицу смещений объектов:
-                objs = insert(objs, obj, -k)
-                -- и добавить ссылку на только что добавленный объект в таблицу ссылок:
-                xrefs = insert(xrefs, {relocs[i]}, -k)
-            else -- Если смещение объекта уже есть в таблице, то
-                -- дописываем ссылку на него в таблицу ссылок:
-                xrefs[k] &= relocs[i]
-            end if
-        end if
-    end for
-    return {objs, xrefs}
-end function
-
--- Пока не используется
 public
 function get_cross_references_to_map(atom fn, sequence relocs, sequence sections, atom image_base)
     atom obj
@@ -509,43 +472,6 @@ function letter(integer i)
 end function
 
 -- Получить список строк в виде списка пар {смещение, строка}
-public
-function extract_strings(atom fn, sequence objs)
-    sequence strings = {}
-    object buf
-    integer len
-    
-    for i = 1 to length(objs) do
-        -- исключить ссылки на середины строк:
-        if length(strings)>0 and objs[i]<=strings[$][1]+len then
-            continue
-        end if
-        -- считываем блок данных:
-        seek(fn, objs[i])
-        buf = get_bytes(fn, blocksize)
-        if atom(buf) then
-            return -1
-        end if
-        -- проверяем, является ли данный объект строкой:
-        len = -1
-        integer letters = 0
-        for j = 1 to length(buf) do
-            if buf[j] = 0 then
-                len = j-1
-                exit
-            elsif not allowed(buf[j]) then
-                exit
-            elsif letter(buf[j]) then
-                letters += 1
-            end if
-        end for
-        if len>0 and letters>0 then
-            strings = append(strings,{objs[i],buf[1..len]})
-        end if
-    end for
-    return strings
-end function
-
 sequence strings
 function check_string(object key, object val, object fn, integer progress_code)
     object buf
