@@ -311,19 +311,17 @@ for i = 1 to length(strings) do
                 else
                     new_ref = start_rva+new_ref_off
                 end if
-                mach = pad_tail(mach, x[1], NOP) -- добиваем освободившиеся байты пустыми командами
-                sequence bak_mach = fpeek(fn, {start,x[1]}) -- сохраняем затираемые байты
-                fpoke(fn, start, mach) -- патчим код!
-                -- Исправляем битые релокации --
+                -- Исправляем релокации --
                 x[3] += start_rva-1 -- получаем адреса удаленных ссылок
                 integer mod_reloc = modify_relocations(fn, sections, (-x[3]) & new_ref)
-                if mod_reloc != 0 and debug then
-                    fpoke(fn, start, bak_mach) -- rolling back
-                    if debug then
-                        printf(1,"|%s|%s| <- %x (%x)\n",
-                            {strings[i][2], translation} & refs[j] & ( off_to_rva_ex(refs[j], sections[1])+image_base ) )
-                        printf(1, "Failed to fix relocations (Returned #%x). Rolling back.\n",mod_reloc)
-                    end if
+                if mod_reloc = 0 then
+                    -- Если удалось исправить релокации, то правим код:
+                    mach = pad_tail(mach, x[1], NOP) -- добиваем освободившиеся байты пустыми командами
+                    fpoke(fn, start, mach)
+                elsif debug then
+                    printf(1,"|%s|%s| <- %x (%x)\n",
+                        {strings[i][2], translation} & refs[j] & ( off_to_rva_ex(refs[j], sections[1])+image_base ) )
+                    printf(1, "Failed to fix relocations (Returned #%x).\n",mod_reloc)
                 end if
             elsif debug then
                 printf(1,"|%s|%s| <- %x (%x)\n",

@@ -277,6 +277,8 @@ function fix_len(atom fn, atom off, integer oldlen, integer len)
                     -- Возвращаем адрес команды перехода, маш. код указания длины строки и старый адрес перехода:
                     return {oldnext, {POP_REG+reg, PUSH_IMM8, len}, next} -- pop REG \\ push len
                 end if
+            -- elsif length(aft)>0 and and_bits(aft[1], #F8) = PUSH_REG and aft[2] = JMP_NEAR then
+                -- mov eax, offset str; push reg; jmp near somewhere - не найдено ни одного случая
             end if
         elsif reg = ESI then -- mov esi, offset str
             if pre[$-5] = MOV_REG_IMM + 8 + ECX and
