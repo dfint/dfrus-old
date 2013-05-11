@@ -200,22 +200,21 @@ for i = 1 to length(strings) do
         continue -- перевод равен оригиналу
     end if
     
-    -- ѕоиск строки в таблице объектов:
-    integer k = binary_search(strings[i][OFF], objs)
-    sequence refs = map:get(xref_map, strings[i][OFF]) -- список ссылок на данную строку
+    -- —писок ссылок на данную строку:
+    sequence refs = map:get(xref_map, strings[i][OFF]) 
     
-    -- Ќаходим ссылки на середину строки
-    -- что это и как работает ???
-    integer l = 1
-    while objs[k+l]-strings[i][OFF] < length(strings[i][STR])+1 do
+    -- ≈сли кроме ссылки на начало строки есть ссылки на ее середину,
+    -- то ссылкой на строку считать самую раннюю из них
+    integer l = 4
+    while map:has(xref_map, strings[i][OFF]+l) and l < length(strings[i][STR])+1 do -- <= ?
         for j = 1 to length(refs) do
-            sequence x = map:get(xref_map, objs[k+l])
-            integer delta =  refs[j] - x[1]
-            if length(x[1]) = 1 and delta>0 and delta<=6 then
+            sequence x = map:get(xref_map, strings[i][OFF]+l)
+            integer delta = refs[j] - x[1]
+            if length(x[1]) = 1 and delta>0 and delta<=6 then -- 6 - длина команды MOV REG, [IMM32]
                 refs[j] = x[1]
             end if
         end for
-        l += 1
+        l += 4
     end while
     
     integer aligned_len = align(length(strings[i][STR])+1) -- ћаксимальна€ длина "короткой" строки
