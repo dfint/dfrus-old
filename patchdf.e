@@ -541,6 +541,7 @@ function letter(integer i)
     return (i>='A' and i<='Z') or (i>='a' and i<='z')
 end function
 
+-- ѕолучить список строк в виде списка пар {смещение, строка}
 public
 function extract_strings(atom fn, sequence objs)
     sequence strings = {}
@@ -580,40 +581,7 @@ end function
 
 public
 function extract_strings_map(atom fn, map xrefs)
-    sequence
-        objs = keys(xrefs,1),
-        strings = {}
-    object buf
-    integer len
-    
-    for i = 1 to length(objs) do
-        -- исключить ссылки на середины строк:
-        if length(strings)>0 and objs[i]<=strings[$][1]+len then
-            continue
-        end if
-        -- считываем блок данных:
-        seek(fn, objs[i])
-        buf = get_bytes(fn, blocksize)
-        if atom(buf) then
-            return -1
-        end if
-        len = -1
-        integer letters = 0
-        for j = 1 to length(buf) do
-            if buf[j] = 0 then
-                len = j-1
-                exit
-            elsif not allowed(buf[j]) then
-                exit
-            elsif letter(buf[j]) then
-                letters += 1
-            end if
-        end for
-        if len>0 and letters>0 then
-            strings = append(strings,{objs[i],buf[1..len]})
-        end if
-    end for
-    return strings
+    return extract_strings(fn, keys(xrefs,1))
 end function
 
 -- "петл€" кода в отдельной секции
