@@ -105,12 +105,10 @@ constant
     sections = get_section_table(fn, pe_header)
 
 -- Получаем адреса всех перемещаемых элементов:
-sequence
-    relocs = get_relocations(fn,sections)
+sequence relocs = get_relocations(fn,sections)
 
 -- Получаем перекрёстные ссылки:
 object xref_map = get_cross_references_to_map(fn,relocs,sections,image_base)
-sequence objs = keys(xref_map, 1) -- отсортированный список ключей
 
 -----------------------------------------------------------------------------
 puts(1,"Enabling the cyrillic alphabet...\n")
@@ -170,7 +168,8 @@ function second(sequence s)
     return s[2]
 end function
 
-sequence strings = extract_strings(fn, objs)
+-- sequence strings = extract_strings(fn, objs)
+sequence strings = extract_strings_map(fn, xref_map)
 if debug then
     printf(1,"%d strings extracted.\n", length(strings))
     if length(cmd)>=5 then
