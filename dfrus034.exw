@@ -262,10 +262,10 @@ for i = 1 to length(strings) do
                 new_sect_off = add_to_new_section(fn, new_sect_off, mach) 
                 disp = stitch_rva-(src_rva+5)
                 fpoke4(fn, src+1, disp) -- делаем переход на петлю
-                if debug then
-                    printf(1,"Added stitch at #%x for |%s|%s|\n",
-                        {src_rva+image_base, strings[i][STR],translation})
-                end if
+                -- if debug then
+                    -- printf(1,"Added stitch at #%x for |%s|%s|\n",
+                        -- {src_rva+image_base, strings[i][STR],translation})
+                -- end if
             end if
             fix = -1 -- считаем, что длина строки исправлена (даже если наткнулись на short jmp)
         end if
