@@ -216,12 +216,22 @@ function analyse_modrm(sequence s, integer i)
     sequence modrm, sib
     sequence result
     atom disp = 0
+    integer j = i
+    if length(s)<i then
+        return length(s)-i
+    end if
     modrm = triads(s[i])
     i += 1
     result = {modrm}
     if modrm[1] != 3 then -- Не регистровая адресация
+        if length(s)<i then
+            return length(s)-i
+        end if
         if modrm[1] = 0 and modrm[3] = 5 then
             -- Прямая адресация [imm32]
+            if length(s)<i+3 then
+                return length(s)-i-3
+            end if
             result &= bytes_to_int(s[i..i+3])
             i += 4
         else
@@ -233,10 +243,16 @@ function analyse_modrm(sequence s, integer i)
             end if
             
             if modrm[1] = 1 then
+                if length(s)<i then
+                    return length(s)-i
+                end if
                 disp = check_sign_bit(s[i], 8)
                 i += 1
                 result &= disp
             elsif modrm[1] = 2 then
+                if length(s)<i+3 then
+                    return length(s)-i-3
+                end if
                 disp = check_sign_bit(bytes_to_int(s[i..i+3]), 32)
                 i += 4
                 result &= disp
@@ -401,68 +417,110 @@ function disasm(integer start_addr, sequence s, integer i=1)
         text = "int3"
         i += 1
     elsif s[i] = CALL_NEAR then
+        if length(s)<i+4 then
+            return length(s)-(i+4)
+        end if
         atom immediate = addr+5+check_sign_bit(bytes_to_int(s[i+1..i+4]),32)
         text = sprintf("call near %s",{asmhex(immediate)})
         i += 5
     elsif s[i] = JMP_NEAR then
+        if length(s)<i+4 then
+            return length(s)-(i+4)
+        end if
         atom immediate = addr+5+check_sign_bit(bytes_to_int(s[i+1..i+4]),32)
         text = sprintf("jmp near %s",{asmhex(immediate)})
         i += 5
     elsif s[i] = JMP_SHORT then
+        if length(s)<i+1 then
+            return length(s)-(i+1)
+        end if
         integer immediate = addr+2+check_sign_bit(s[i+1])
         text = sprintf("jmp short %s",{asmhex(immediate)})
         i += 2
     elsif and_bits(s[i],#F8) = JCC_SHORT then
+        if length(s)<i+1 then
+            return length(s)-(i+1)
+        end if
         integer immediate = addr+2+check_sign_bit(s[i+1])
         text = sprintf("j%s short %s",{conds[and_bits(s[i],7)+1], asmhex(immediate)})
         i += 2
     elsif s[i] = LEA then
-        sequence x = analyse_modrm(s,i+1)
+        object x = analyse_modrm(s,i+1)
+        if atom(x) then
+            return x
+        end if
         i = x[$]
         x = unify_operands(x)
         text = sprintf("lea %s, %s", {op_to_text(x[1]), op_to_text(x[2])})
     elsif s[i] = SUB_REG_RM then
-        sequence x = analyse_modrm(s,i+1)
+        object x = analyse_modrm(s,i+1)
+        if atom(x) then
+            return x
+        end if
         i = x[$]
         x = unify_operands(x)
         text = sprintf("sub %s, %s", {op_to_text(x[1]), op_to_text(x[2])})
     elsif s[i] = SUB_RM_IMM then
-        sequence x = analyse_modrm(s,i+1)
+        object x = analyse_modrm(s,i+1)
+        if atom(x) then
+            return x
+        end if
         if x[1][2] = 5 then
             i = x[$]
             x = unify_operands(x)
+            if length(s)<i+3 then
+                return length(s)-(i+3)
+            end if
             atom immediate = bytes_to_int(s[i..i+3])
             text = sprintf("sub %s, %s", {op_to_text(x[2]), asmhex(immediate)})
             i += 4
         end if
     elsif and_bits(s[i],#FC) = MOV_RM_REG then
         integer d = and_bits(s[i],2)
-        sequence x = analyse_modrm(s,i+1)
+        object x = analyse_modrm(s,i+1)
+        if atom(x) then
+            return x
+        end if
         i = x[$]
         x = unify_operands(x)
         text = sprintf("mov %s, %s", swap({op_to_text(x[1]), op_prefix & op_to_text(x[2])},not d))
     elsif s[i] = MOV_MEM_IMM then
-        sequence x = analyse_modrm(s,i+1)
+        object x = analyse_modrm(s,i+1)
+        if atom(x) then
+            return x
+        end if
         if x[1][2] = 0 then
             i = x[$]
             x = unify_operands(x)
+            if length(s)<i+3 then
+                return length(s)-(i+3)
+            end if
             atom immediate = bytes_to_int(s[i..i+3])
             text = sprintf("mov %s, %s", {op_to_text(x[2]), asmhex(immediate)})
             i += 4
         end if
     elsif and_bits(s[i],#FD) = MOV_RM_SEG then
         integer d = and_bits(s[i],2)
-        sequence x = analyse_modrm(s,i+1)
+        object x = analyse_modrm(s,i+1)
+        if atom(x) then
+            return x
+        end if
         i = x[$]
         x = unify_operands(x)
         text = sprintf("mov %s, %s", swap({regs[x[1]+1][4], op_prefix & op_to_text(x[2])}, not d))
     elsif and_bits(s[i],#FC) = MOV_ACC_MEM then
         integer d = and_bits(s[i],2)
-        integer immediate = bytes_to_int(s[i+1..i+4])
+        if length(s)<i+4 then
+            return length(s)-(i+4)
+        end if
+        atom immediate = bytes_to_int(s[i+1..i+4])
         text = sprintf("mov %s, %s", swap({regs[EAX+1][3],op_prefix&'['&asmhex(immediate)&']'},d))
         i += 5
     elsif and_bits(s[i],#FC) = XOR_RM_REG then
-        sequence x = analyse_modrm(s,i+1)
+        object x = analyse_modrm(s,i+1)
+        if atom(x) then
+            return x
+        end if
         i = x[$]
         x = unify_operands(x)
         text = sprintf("xor %s, %s", {op_to_text(x[1]), op_to_text(x[2])})
@@ -474,9 +532,15 @@ function disasm(integer start_addr, sequence s, integer i=1)
         integer size = and_bits(s[i],2)
         atom immediate
         if size then
+            if length(s)<i+1 then
+                return length(s)-(i+4)
+            end if
             immediate = s[i+1]
             i += 2
         else
+            if length(s)<i+4 then
+                return length(s)-(i+4)
+            end if
             immediate = bytes_to_int(s[i+1..i+4])
             i += 5
         end if
@@ -486,7 +550,10 @@ function disasm(integer start_addr, sequence s, integer i=1)
         text = sprintf("pop %s",{regs[reg+1][3]})
         i += 1
     elsif s[i] = POP_RM then
-        sequence x = analyse_modrm(s,i+1)
+        object x = analyse_modrm(s,i+1)
+        if atom(x) then
+            return x
+        end if
         i = x[$]
         x = unify_operands(x)
         text = sprintf("pop dword ptr %s", {op_to_text(x[2])})
@@ -494,7 +561,10 @@ function disasm(integer start_addr, sequence s, integer i=1)
         integer flags = and_bits(s[i],3)
         
         if flags != 2 then
-            sequence x = analyse_modrm(s,i+1)
+            object x = analyse_modrm(s,i+1)
+            if atom(x) then
+                return x
+            end if
             if x[1][2] = 7 then
                 i = x[$]
                 x = unify_operands(x)
@@ -507,9 +577,15 @@ function disasm(integer start_addr, sequence s, integer i=1)
                 text &= op_to_text(x[2]) & ", "
                 atom immediate
                 if flags = 1 then
+                    if length(s)<i+3 then
+                        return s-(i+3)
+                    end if
                     immediate = bytes_to_int(s[i..i+3])
                     i += 4
                 else
+                    if length(s)<i then
+                        return length(s)-i
+                    end if
                     immediate = s[i]
                     i += 1
                 end if
@@ -519,16 +595,22 @@ function disasm(integer start_addr, sequence s, integer i=1)
     elsif s[i] = #FF then
         i += 1
         if s[i] = JMP_INDIR[2] then
-            integer immediate = bytes_to_int(s[i+1..i+4])
+            atom immediate = bytes_to_int(s[i+1..i+4])
             text = sprintf("jmp dword ptr %s[%s]",{op_prefix,asmhex(immediate)})
             i += 5
         elsif and_bits(s[i],#38) = PUSH_INDIR[2] then
-            sequence x = analyse_modrm(s,i) -- байт mod r/m накладывается на опкод
+            object x = analyse_modrm(s,i) -- байт mod r/m накладывается на опкод
+            if atom(x) then
+                return x
+            end if
             i = x[$]
             x = unify_operands(x)
             text = sprintf("push dword ptr %s%s", {op_prefix, op_to_text(x[2])})
         elsif and_bits(s[i],#38) = CALL_INDIR[2] then
-            sequence x = analyse_modrm(s,i) -- байт mod r/m накладывается на опкод
+            object x = analyse_modrm(s,i) -- байт mod r/m накладывается на опкод
+            if atom(x) then
+                return x
+            end if
             i = x[$]
             x = unify_operands(x)
             text = sprintf("call dword ptr %s%s", {op_prefix, op_to_text(x[2])})
