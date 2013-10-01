@@ -395,10 +395,18 @@ function disasm(integer start_addr, sequence s, integer i=1)
     integer j = i
     integer addr = start_addr+i-1
     integer seg
+    integer op_size = 0
+    -- sequence prefixes = {}
     -- Прежде всего, нужно разобрать префиксы. Некоторые префиксы (REP, например) можно отображать как отдельные инструкции
     seg = find(s[i],{SEG_CS,SEG_DS,SEG_ES,SEG_SS,SEG_FS,SEG_GS})
     if seg then
         op_prefix = seg_tags[seg]
+        -- prefixes = prepend(prefixes, s[i])
+        i += 1
+    end if
+    if s[i]=PREFIX_OPERAND_SIZE then
+        -- prefixes = prepend(prefixes, s[i])
+        op_size = 1
         i += 1
     end if
     if s[i] = NOP then
@@ -483,7 +491,7 @@ function disasm(integer start_addr, sequence s, integer i=1)
         end if
         i = x[$]
         x = unify_operands(x)
-        text = sprintf("mov %s, %s", swap({op_to_text(x[1]), op_prefix & op_to_text(x[2])},not d))
+        text = sprintf("mov %s, %s", swap({regs[x[1]+1][3-op_size], op_prefix & op_to_text(x[2])},not d))
     elsif s[i] = MOV_MEM_IMM then
         object x = analyse_modrm(s,i+1)
         if atom(x) then
