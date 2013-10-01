@@ -159,6 +159,21 @@ function fix_len(atom fn, atom off, integer oldlen, integer len)
                 return 1
             elsif pre[$-5] = MOV_REG_IMM + 8 + EDI and
                     bytes_to_int(pre[$-4..$-1]) = oldlen then -- mov edi,len ; до
+                if oldlen = 15 then
+                    integer i = 1
+                    while i<length(aft) and oldlen = 15 do
+                        object x = disasm(next,aft,i)
+                        if atom(x) then
+                            exit
+                        end if
+                        printf(1,"%08x\t%s\n",x[1..$-1])
+                        i = x[$]
+                    end while
+                    if length(aft)>0 then
+                        getc(0)
+                        puts(1,'\n')
+                    end if
+                end if
                 fpoke4(fn, off-5, len)
                 return 1
             elsif length(aft)>0 and aft[1] = MOV_REG_IMM + 8 + EDI and
