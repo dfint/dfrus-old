@@ -159,7 +159,7 @@ sequence new_section = {
 }
 
 atom new_sect_off = new_section[SECTION_POFFSET] -- —мещение в новой секции
-integer aligned = 0
+-- integer aligned = 0
 
 -----------------------------------------------------------------------------
 puts(1,"Translating...\n")
@@ -222,7 +222,7 @@ for i = 1 to length(strings) do
     if not long then
         -- ≈сли строка достаточно коротка€, то записать ее поверх старой:
         fpoke(fn, strings[i][OFF], pad_tail(translation & 0, aligned_len, 0)) -- назадействованные байты заполнить нул€ми
-        aligned = 0
+        -- aligned = 0
     else
         -- ≈сли строка длинна€, то записать ее в специально отведенную дл€ этого секцию:
         str_off = new_sect_off
