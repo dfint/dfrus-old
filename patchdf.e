@@ -112,10 +112,11 @@ include disasm.e
 -- {jmp_from, {code}, jmp_to} - данные для создания "петли"
 constant count = #20, count_after = #80
 public
-function fix_len(atom fn, atom off, integer oldlen, integer len)
+function fix_len(atom fn, atom off, integer oldlen, integer len,
+                    object orig = 0, object transl = 0, atom address = 0) -- optional debugging params
     atom next = off+4, oldnext
     sequence pre = fpeek(fn, {off-count,count}),
-             aft = fpeek(fn, {next,count})
+             aft = fpeek(fn, {next,count_after})
     integer r, reg
     integer jmp = 0
     
@@ -131,7 +132,7 @@ function fix_len(atom fn, atom off, integer oldlen, integer len)
         end if
         jmp = aft[1] -- Отмечаем, что байты получены после перехода по jmp
         -- Переходим по jmp и считываем некоторе количество байт оттуда
-        aft = fpeek(fn, {next,count})
+        aft = fpeek(fn, {next,count_after})
     elsif aft[1] = CALL_NEAR or and_bits(aft[1], #F0) = JCC_SHORT or
                     (aft[1] = JCC_NEAR[1] and and_bits(aft[2], #F0) = JCC_NEAR[2]) then
         -- По условным переходам и вызовам подпрогамм мы не ходим
@@ -159,20 +160,25 @@ function fix_len(atom fn, atom off, integer oldlen, integer len)
                 return 1
             elsif pre[$-5] = MOV_REG_IMM + 8 + EDI and
                     bytes_to_int(pre[$-4..$-1]) = oldlen then -- mov edi,len ; до
-                if oldlen = 15 then
+                if /*debug and*/ oldlen = 15 and length(aft)>0 then
                     integer i = 1
-                    while i<length(aft) and oldlen = 15 do
-                        object x = disasm(next,aft,i)
+                    if sequence(orig) and sequence(transl) then
+                        printf(1,"Translating '%s' to '%s':\n", {orig,transl})
+                    end if
+                    while i<length(aft) do
+                        object x = disasm(address+4,aft,i)
                         if atom(x) then
                             exit
                         end if
                         printf(1,"%08x\t%s\n",x[1..$-1])
+                        if aft[i]=CALL_NEAR then
+                            exit
+                        end if
                         i = x[$]
                     end while
-                    if length(aft)>0 then
-                        getc(0)
-                        puts(1,'\n')
-                    end if
+                    
+                    getc(0)
+                    puts(1,'\n')
                 end if
                 fpoke4(fn, off-5, len)
                 return 1

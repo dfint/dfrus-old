@@ -232,7 +232,12 @@ for i = 1 to length(strings) do
     -- Исправляем длину строк по каждой из ссылок на нее
     for j = 1 to length(refs) do
         -- Исправить длину строки:
-        object fix = fix_len(fn, refs[j], length(strings[i][STR]), length(translation))
+        object fix
+        if debug then
+            fix = fix_len(fn, refs[j], length(strings[i][STR]), length(translation), strings[i][STR], translation, off_to_rva_ex(refs[j], sections[1])+image_base)
+        else
+            fix = fix_len(fn, refs[j], length(strings[i][STR]), length(translation))
+        end if
         if sequence(fix) then -- не удалось исправить длину по причине джампа
             if length(fix)<3 then
                 if debug then
