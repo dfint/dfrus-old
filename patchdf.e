@@ -460,7 +460,7 @@ end function
 constant blocksize = 1024
 
 function forbidden(integer i)
-    return find(i,"$;<>@^`{|}")
+    return find(i,"$;@^`{|}")
 end function
 
 function allowed(integer i)
