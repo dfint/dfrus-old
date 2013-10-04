@@ -23,11 +23,11 @@ procedure patch_unicode_table(atom fn, atom off)
     fpoke4(fn, off+'А'*4, cyr)
 end procedure
 
-ifdef debug then
-    -- pass
-elsedef
-    constant debug = 0
-end ifdef
+-- ifdef debug then
+    -- -- pass
+-- elsedef
+    -- constant debug = 0
+-- end ifdef
 
 public
 function load_trans_file_to_map(sequence fname)
@@ -48,7 +48,7 @@ function load_trans_file_to_map(sequence fname)
         x = split(line, '|')
         if length(x)>3 then
             if has(trans,x[2]) and debug then
-                printf(1,"Warning: there already is <%s> key in the map.\n",{x[2]})
+                printf(1,"Warning: there already is '%s' key in the map.\n",{x[2]})
             end if
             put(trans,x[2],x[3])
         end if
@@ -159,7 +159,7 @@ function fix_len(atom fn, atom off, integer oldlen, integer len,
                 end if
             elsif pre[$-5] = MOV_REG_IMM + 8 + EDI and
                     bytes_to_int(pre[$-4..$-1]) = oldlen then -- mov edi,len ; до
-                if /*debug and*/ oldlen = 15 and length(aft)>0 then
+                if debug and oldlen = 15 and length(aft)>0 then
                     integer i = 1
                     if sequence(orig) and sequence(transl) then
                         printf(1,"Translating '%s' to '%s':\n", {orig,transl})
