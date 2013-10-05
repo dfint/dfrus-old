@@ -209,12 +209,12 @@ function fix_len(atom fn, atom off, integer oldlen, integer len)
                 -- mov eax, offset str; push reg; jmp near somewhere - не найдено ни одного случая
             end if
         elsif reg = ESI then -- mov esi, offset str
-            if pre[$-5] = MOV_REG_IMM + 8 + ECX and
+            if pre[$-5] = MOV_REG_IMM + 8 + ECX and -- mov ecx, (len+1)/4
                     bytes_to_int(pre[$-4..$-1]) = floor((oldlen+1)/4) then
                 r = remainder(oldlen+1,4)
                 fpoke4(fn, off-5, floor((len+1-r+3)/4)) -- с учетом инструкций, копирующих остаток строки
                 return 1
-            elsif pre[$-3] = LEA and and_bits(pre[$-2],#F8) = glue_triads(1,ECX,0) and pre[$-1]=floor((oldlen+1)/4) then
+            elsif pre[$-3] = LEA and and_bits(pre[$-2],#F8) = glue_triads(1,ECX,0) and pre[$-1]=floor((oldlen+1)/4) then -- lea ecx, [reg+(len+1)/4]
                 r = remainder(oldlen+1,4)
                 fpoke(fn, off-2, floor((len+1-r+3)/4))
             elsif len > oldlen then
