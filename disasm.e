@@ -35,6 +35,9 @@ public constant
 
 public constant
     RET_NEAR    = #C3,
+    RET_FAR     = #CB,
+    RET_NEAR_D  = #C2,
+    RET_FAR_D   = #CA,
     LEAVE       = #C9,
     INT3        = #CC
 
@@ -113,6 +116,10 @@ public constant
     OP_RM_IMM   = #80,
     OP_RM_IMM32 = #80, -- + width
     OP_RM_IMM8  = #83,
+    $
+
+public constant
+    CMP_ACC_IMM = #3C, -- + width
     $
 
 public constant LEA = #8D
@@ -419,6 +426,11 @@ function disasm(integer start_addr, sequence s, integer i=1)
     elsif s[i] = RET_NEAR then
         text = "retn"
         i += 1
+    elsif s[i] = RET_NEAR_D then
+        text = "retn"
+        integer immediate = bytes_to_int(s[i+1..i+2])
+        text = sprintf("retn %s",{asmhex(immediate)})
+        i += 3
     elsif s[i] = PUSHFD then
         text = "pushfd"
         i += 1
@@ -488,6 +500,8 @@ function disasm(integer start_addr, sequence s, integer i=1)
             if not atom(x[2]) then
                 if flags = 0 then
                     text &= "byte "
+                elsif op_size = 1 then
+                    text &= "word "
                 else
                     text &= "dword "
                 end if
@@ -533,20 +547,21 @@ function disasm(integer start_addr, sequence s, integer i=1)
                 return length(s)-(i+3)
             end if
             atom immediate
+            sequence size_spec
             if size=0 then
                 immediate = s[i]
-                text = sprintf("mov byte %s, %s", {op_to_text(x[2]), asmhex(immediate)})
+                size_spec = "byte"
                 i += 1
             elsif op_size = 1 then
                 immediate = bytes_to_int(s[i..i+1])
-                text = sprintf("mov word %s, %s", {op_to_text(x[2]), asmhex(immediate)})
+                size_spec = "word"
                 i += 2
             else
                 immediate = bytes_to_int(s[i..i+3])
-                text = sprintf("mov dword %s, %s", {op_to_text(x[2]), asmhex(immediate)})
+                size_spec = "dword"
                 i += 4
             end if
-            
+            text = sprintf("mov %s %s, %s", {size_spec, op_to_text(x[2]), asmhex(immediate)})
         end if
     elsif and_bits(s[i],#FD) = MOV_RM_SEG then
         integer d = and_bits(s[i],2)
@@ -565,6 +580,34 @@ function disasm(integer start_addr, sequence s, integer i=1)
         atom immediate = bytes_to_int(s[i+1..i+4])
         text = sprintf("mov %s, %s", swap({regs[EAX+1][3],op_prefix&'['&asmhex(immediate)&']'},d))
         i += 5
+    elsif and_bits(s[i],#FE) = CMP_ACC_IMM then
+        integer size = and_bits(s[i],1)
+        i += 1
+        atom immediate
+        sequence acc
+        if size then
+            immediate = bytes_to_int(s[i..i+3])
+            acc = "eax"
+            i += 4
+        else
+            immediate = s[i]
+            acc = "al"
+            i += 1
+        end if
+        text = sprintf("cmp %s, %s", {acc, asmhex(immediate)})
+    elsif and_bits(s[i],#F0) = MOV_REG_IMM then
+        integer size = and_bits(s[i],8)/8
+        integer reg = and_bits(s[i],7)
+        i += 1
+        atom immediate
+        if size then
+            immediate = bytes_to_int(s[i..i+3])
+            i += 4
+        else
+            immediate = s[i]
+            i += 1
+        end if
+        text = sprintf("mov %s, %s", {regs[reg+1][1+size*2], asmhex(immediate)})
     elsif and_bits(s[i],#FC) = XOR_RM_REG then
         object x = analyse_modrm(s,i+1)
         if atom(x) then
