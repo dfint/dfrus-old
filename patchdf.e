@@ -23,11 +23,11 @@ procedure patch_unicode_table(atom fn, atom off)
     fpoke4(fn, off+'À'*4, cyr)
 end procedure
 
--- ifdef debug then
-    -- -- pass
--- elsedef
-    -- constant debug = 0
--- end ifdef
+ifdef DEBUG then
+    puts(1,"Debug is defined\n")
+elsedef
+    constant debug = 0
+end ifdef
 
 public
 function load_trans_file_to_map(sequence fname)
