@@ -102,7 +102,8 @@ public constant
     MOV_ACC_MEM = #A0, -- + 2*dir + width
     MOV_RM_REG  = #88, -- + 2*dir + width
     MOV_REG_RM  = MOV_RM_REG+2, -- + width
-    MOV_MEM_IMM = #C7,
+    MOV_MEM_IMM8 = #C6,
+    MOV_MEM_IMM = MOV_MEM_IMM8+1,
     MOV_RM_SEG  = #8C, -- + 2*dir
     $
 
@@ -485,15 +486,18 @@ function disasm(integer start_addr, sequence s, integer i=1)
         end if
     elsif and_bits(s[i],#FC) = MOV_RM_REG then
         integer d = and_bits(s[i],2)
+        integer size = and_bits(s[i],1)
         object x = analyse_modrm(s,i+1)
         if atom(x) then
             return x
         end if
         i = x[$]
         x = unify_operands(x)
-        text = sprintf("mov %s, %s", swap({regs[x[1]+1][3-op_size], op_prefix & op_to_text(x[2])},not d))
-    elsif s[i] = MOV_MEM_IMM then
+        sequence reg
+        text = sprintf("mov %s, %s", swap({regs[x[1]+1][1+size*2-op_size], op_prefix & op_to_text(x[2])},not d))
+    elsif and_bits(s[i],#FE) = MOV_MEM_IMM8 then
         object x = analyse_modrm(s,i+1)
+        integer size = and_bits(s[i],1)
         if atom(x) then
             return x
         end if
@@ -503,9 +507,21 @@ function disasm(integer start_addr, sequence s, integer i=1)
             if length(s)<i+3 then
                 return length(s)-(i+3)
             end if
-            atom immediate = bytes_to_int(s[i..i+3])
-            text = sprintf("mov %s, %s", {op_to_text(x[2]), asmhex(immediate)})
-            i += 4
+            atom immediate
+            if size=0 then
+                immediate = s[i]
+                text = sprintf("mov byte %s, %s", {op_to_text(x[2]), asmhex(immediate)})
+                i += 1
+            elsif op_size = 1 then
+                immediate = bytes_to_int(s[i..i+1])
+                text = sprintf("mov word %s, %s", {op_to_text(x[2]), asmhex(immediate)})
+                i += 2
+            else
+                immediate = bytes_to_int(s[i..i+3])
+                text = sprintf("mov dword %s, %s", {op_to_text(x[2]), asmhex(immediate)})
+                i += 4
+            end if
+            
         end if
     elsif and_bits(s[i],#FD) = MOV_RM_SEG then
         integer d = and_bits(s[i],2)
@@ -564,7 +580,7 @@ function disasm(integer start_addr, sequence s, integer i=1)
         end if
         i = x[$]
         x = unify_operands(x)
-        text = sprintf("pop dword ptr %s", {op_to_text(x[2])})
+        text = sprintf("pop dword %s", {op_to_text(x[2])})
     elsif and_bits(s[i],#FC) = CMP_RM_IMM then
         integer flags = and_bits(s[i],3)
         
@@ -578,9 +594,9 @@ function disasm(integer start_addr, sequence s, integer i=1)
                 x = unify_operands(x)
                 text = "cmp "
                 if flags = 0 then
-                    text &= "byte ptr "
+                    text &= "byte "
                 else
-                    text &= "dword ptr "
+                    text &= "dword "
                 end if
                 text &= op_to_text(x[2]) & ", "
                 atom immediate
@@ -604,7 +620,7 @@ function disasm(integer start_addr, sequence s, integer i=1)
         i += 1
         if s[i] = JMP_INDIR[2] then
             atom immediate = bytes_to_int(s[i+1..i+4])
-            text = sprintf("jmp dword ptr %s[%s]",{op_prefix,asmhex(immediate)})
+            text = sprintf("jmp dword %s[%s]",{op_prefix,asmhex(immediate)})
             i += 5
         elsif and_bits(s[i],#38) = PUSH_INDIR[2] then
             object x = analyse_modrm(s,i) -- байт mod r/m накладывается на опкод
@@ -613,7 +629,7 @@ function disasm(integer start_addr, sequence s, integer i=1)
             end if
             i = x[$]
             x = unify_operands(x)
-            text = sprintf("push dword ptr %s%s", {op_prefix, op_to_text(x[2])})
+            text = sprintf("push dword %s%s", {op_prefix, op_to_text(x[2])})
         elsif and_bits(s[i],#38) = CALL_INDIR[2] then
             object x = analyse_modrm(s,i) -- байт mod r/m накладывается на опкод
             if atom(x) then
@@ -621,7 +637,7 @@ function disasm(integer start_addr, sequence s, integer i=1)
             end if
             i = x[$]
             x = unify_operands(x)
-            text = sprintf("call dword ptr %s%s", {op_prefix, op_to_text(x[2])})
+            text = sprintf("call dword %s%s", {op_prefix, op_to_text(x[2])})
         end if
     end if
     
