@@ -23,8 +23,8 @@ procedure patch_unicode_table(atom fn, atom off)
     fpoke4(fn, off+'А'*4, cyr)
 end procedure
 
-ifdef debug then
-    -- pass
+ifdef DEBUG then
+    puts(1,"Debug is defined\n")
 elsedef
     constant debug = 0
 end ifdef
@@ -48,7 +48,7 @@ function load_trans_file_to_map(sequence fname)
         x = split(line, '|')
         if length(x)>3 then
             if has(trans,x[2]) and debug then
-                printf(1,"Warning: there already is <%s> key in the map.\n",{x[2]})
+                printf(1,"Warning: there already is '%s' key in the map.\n",{x[2]})
             end if
             put(trans,x[2],x[3])
         end if
@@ -112,10 +112,11 @@ include disasm.e
 -- {jmp_from, {code}, jmp_to} - данные для создания "петли"
 constant count = #20, count_after = #80
 public
-function fix_len(atom fn, atom off, integer oldlen, integer len)
+function fix_len(atom fn, atom off, integer oldlen, integer len,
+                    object orig = 0, object transl = 0, atom address = 0) -- optional debugging params
     atom next = off+4, oldnext
     sequence pre = fpeek(fn, {off-count,count}),
-             aft = fpeek(fn, {next,count})
+             aft = fpeek(fn, {next,count_after})
     integer r, reg
     integer jmp = 0
     
@@ -131,7 +132,7 @@ function fix_len(atom fn, atom off, integer oldlen, integer len)
         end if
         jmp = aft[1] -- Отмечаем, что байты получены после перехода по jmp
         -- Переходим по jmp и считываем некоторе количество байт оттуда
-        aft = fpeek(fn, {next,count})
+        aft = fpeek(fn, {next,count_after})
     elsif aft[1] = CALL_NEAR or and_bits(aft[1], #F0) = JCC_SHORT or
                     (aft[1] = JCC_NEAR[1] and and_bits(aft[2], #F0) = JCC_NEAR[2]) then
         -- По условным переходам и вызовам подпрогамм мы не ходим
@@ -147,35 +148,53 @@ function fix_len(atom fn, atom off, integer oldlen, integer len)
                 fpoke(fn,off-2,len)
                 return 1
             elsif length(aft)>0 and aft[1] = PUSH_IMM8 and aft[2] = oldlen then -- push len
-                if jmp then
-                    if jmp = JMP_NEAR then
-                        -- Возвращаем адрес команды перехода, маш. код указания длины строки и новый адрес перехода:
-                        return {oldnext, {PUSH_IMM8, len}, next+2} -- push len8
-                    else
-                        return -1 -- короткий переход, невозможно добавить "петлю"
-                    end if
+                if not jmp then
+                    fpoke(fn, next+1, len)
+                    return 1
+                elsif jmp = JMP_NEAR then
+                    -- Возвращаем адрес команды перехода, маш. код указания длины строки и новый адрес перехода:
+                    return {oldnext, {PUSH_IMM8, len}, next+2} -- push len8
+                else -- jmp = JMP_SHORT
+                    return -1 -- короткий переход, невозможно добавить "петлю"
                 end if
-                fpoke(fn, next+1, len)
-                return 1
             elsif pre[$-5] = MOV_REG_IMM + 8 + EDI and
                     bytes_to_int(pre[$-4..$-1]) = oldlen then -- mov edi,len ; до
+                if debug and oldlen = 15 and length(aft)>0 then
+                    integer i = 1
+                    if sequence(orig) and sequence(transl) then
+                        printf(1,"Translating '%s' to '%s':\n", {orig,transl})
+                    end if
+                    while i<length(aft) do
+                        object x = disasm(address+4,aft,i)
+                        if atom(x) then
+                            exit
+                        end if
+                        printf(1,"%08x\t%s\n",x[1..$-1])
+                        if aft[i]=CALL_NEAR then
+                            exit
+                        end if
+                        i = x[$]
+                    end while
+                    
+                    getc(0)
+                    puts(1,'\n')
+                end if
                 fpoke4(fn, off-5, len)
                 return 1
             elsif length(aft)>0 and aft[1] = MOV_REG_IMM + 8 + EDI and
                     bytes_to_int(aft[2..5]) = oldlen then -- mov edi,len ; после
-                if jmp then
-                    if jmp = JMP_NEAR then
-                        -- Возвращаем адрес команды перехода, маш. код указания длины строки и старый адрес перехода:
-                        return {oldnext,
-                            (MOV_REG_IMM + 8 + EDI) & int_to_bytes(len), -- mov edi, len32
-                            next+5}
-                    else
-                        -- return -1 -- короткий переход, невозможно добавить "петлю" - считаем что так и надо
-                        return {oldnext, next}
-                    end if
+                if not jmp then
+                    fpoke4(fn, next+1, len)
+                    return 1
+                elsif jmp = JMP_NEAR then
+                    -- Возвращаем адрес команды перехода, маш. код указания длины строки и старый адрес перехода:
+                    return {oldnext,
+                        (MOV_REG_IMM + 8 + EDI) & int_to_bytes(len), -- mov edi, len32
+                        next+5}
+                else
+                    -- return -1 -- короткий переход, невозможно добавить "петлю" - считаем что так и надо
+                    return {oldnext, next}
                 end if
-                fpoke4(fn, next+1, len)
-                return 1
             elsif pre[$-3]=LEA and and_bits(pre[$-2],#F8) = glue_triads(1,EDI,0) then -- lea edi, [reg+len]
                 integer disp = check_sign_bit(pre[$-1],8)
                 if disp=oldlen then
@@ -187,12 +206,13 @@ function fix_len(atom fn, atom off, integer oldlen, integer len)
                 end if
             elsif length(aft)>0 and aft[1] = MOV_REG_RM+1 and and_bits(aft[2],#F8) = glue_triads(3,ECX,0) -- mov ecx, reg
                     and aft[3] = PUSH_IMM8 and aft[4] = oldlen then -- push len
-                if jmp then
+                if not jmp then
+                    fpoke(fn, next+3, len)
+                    return 1
+                else
                     -- mov ecx,reg ++ push len не обрабатываем
                     return -1
                 end if
-                fpoke(fn, next+3, len)
-                return 1
             elsif and_bits(pre[$-1],#F8) = PUSH_REG and jmp = JMP_NEAR then
                 -- push reg; mov eax, offset str; jmp near somewhere
                 reg = and_bits(pre[$-1],7)
