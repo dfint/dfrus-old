@@ -13,6 +13,7 @@ include patcher.e
 include pe.e
 include disasm.e
 
+with define DEBUG
 global integer debug = 0
 include patchdf.e
 
