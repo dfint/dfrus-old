@@ -110,8 +110,9 @@ public constant
 public constant
     XOR_RM_REG  = #30, -- + 2*dir + width
     SUB_REG_RM  = #2B,
-    SUB_RM_IMM  = #81,
-    ADD_RM_IMM  = #83, -- #80 + 3*width
+    OP_RM_IMM   = #80,
+    OP_RM_IMM32 = #80, -- + width
+    OP_RM_IMM8  = #83,
     $
 
 public constant LEA = #8D
@@ -389,6 +390,8 @@ end function
 constant seg_tags = {"cs:","ds:","es:","ss:","fs:","gs:"}
 constant op_sizes = {"byte","word","dword"}
 
+constant mnemo = {"add","or","adc","sbb","add","sub","xor","cmp"}
+
 -- Набросок функции, по введенному машинному коду возвращающей его ассемблерное представление
 public
 function disasm(integer start_addr, sequence s, integer i=1)
@@ -451,7 +454,8 @@ function disasm(integer start_addr, sequence s, integer i=1)
             return length(s)-(i+1)
         end if
         integer immediate = addr+2+check_sign_bit(s[i+1])
-        text = sprintf("j%s short %s",{conds[and_bits(s[i],7)+1], asmhex(immediate)})
+        integer condition = and_bits(s[i],7)
+        text = sprintf("j%s short %s",{conds[condition+1], asmhex(immediate)})
         i += 2
     elsif s[i] = LEA then
         object x = analyse_modrm(s,i+1)
@@ -469,20 +473,41 @@ function disasm(integer start_addr, sequence s, integer i=1)
         i = x[$]
         x = unify_operands(x)
         text = sprintf("sub %s, %s", {op_to_text(x[1]), op_to_text(x[2])})
-    elsif s[i] = SUB_RM_IMM then
-        object x = analyse_modrm(s,i+1)
-        if atom(x) then
-            return x
-        end if
-        if x[1][2] = 5 then
+    elsif and_bits(s[i],#FC) = OP_RM_IMM then
+        integer flags = and_bits(s[i],3)
+        if flags != 2 then
+            object x = analyse_modrm(s,i+1)
+            sequence mnemonix = mnemo[x[1][2]+1]
+            if atom(x) then
+                return x
+            end if
+            
             i = x[$]
             x = unify_operands(x)
-            if length(s)<i+3 then
-                return length(s)-(i+3)
+            text = mnemonix & ' '
+            if not atom(x[2]) then
+                if flags = 0 then
+                    text &= "byte "
+                else
+                    text &= "dword "
+                end if
             end if
-            atom immediate = bytes_to_int(s[i..i+3])
-            text = sprintf("sub %s, %s", {op_to_text(x[2]), asmhex(immediate)})
-            i += 4
+            text &= op_to_text(x[2]) & ", "
+            atom immediate
+            if flags = 1 then
+                if length(s)<i+3 then
+                    return s-(i+3)
+                end if
+                immediate = bytes_to_int(s[i..i+3])
+                i += 4
+            else -- flags = 0 or flags = 3
+                if length(s)<i then
+                    return length(s)-i
+                end if
+                immediate = s[i]
+                i += 1
+            end if
+            text &= asmhex(immediate)
         end if
     elsif and_bits(s[i],#FC) = MOV_RM_REG then
         integer d = and_bits(s[i],2)
@@ -581,41 +606,6 @@ function disasm(integer start_addr, sequence s, integer i=1)
         i = x[$]
         x = unify_operands(x)
         text = sprintf("pop dword %s", {op_to_text(x[2])})
-    elsif and_bits(s[i],#FC) = CMP_RM_IMM then
-        integer flags = and_bits(s[i],3)
-        
-        if flags != 2 then
-            object x = analyse_modrm(s,i+1)
-            if atom(x) then
-                return x
-            end if
-            if x[1][2] = 7 then
-                i = x[$]
-                x = unify_operands(x)
-                text = "cmp "
-                if flags = 0 then
-                    text &= "byte "
-                else
-                    text &= "dword "
-                end if
-                text &= op_to_text(x[2]) & ", "
-                atom immediate
-                if flags = 1 then
-                    if length(s)<i+3 then
-                        return s-(i+3)
-                    end if
-                    immediate = bytes_to_int(s[i..i+3])
-                    i += 4
-                else
-                    if length(s)<i then
-                        return length(s)-i
-                    end if
-                    immediate = s[i]
-                    i += 1
-                end if
-                text &= asmhex(immediate)
-            end if
-        end if
     elsif s[i] = #FF then
         i += 1
         if s[i] = JMP_INDIR[2] then
