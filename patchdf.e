@@ -24,7 +24,7 @@ procedure patch_unicode_table(atom fn, atom off)
 end procedure
 
 ifdef DEBUG then
-    puts(1,"Debug is defined\n")
+    -- pass
 elsedef
     constant debug = 0
 end ifdef
