@@ -36,7 +36,7 @@ public constant
 public constant
     RET_NEAR    = #C3,
     RET_FAR     = #CB,
-    RET_NEAR_D  = #C2,
+    RET_NEAR_N  = #C2,
     RET_FAR_D   = #CA,
     LEAVE       = #C9,
     INT3        = #CC
@@ -418,18 +418,20 @@ function disasm(integer start_addr, sequence s, integer i=1)
         -- prefixes = prepend(prefixes, s[i])
         i += 1
     end if
+    
     if s[i]=PREFIX_OPERAND_SIZE then
         -- prefixes = prepend(prefixes, s[i])
         op_size = 1
         i += 1
     end if
+    
     if s[i] = NOP then
         text = "nop"
         i += 1
     elsif s[i] = RET_NEAR then
         text = "retn"
         i += 1
-    elsif s[i] = RET_NEAR_D then
+    elsif s[i] = RET_NEAR_N then
         text = "retn"
         integer immediate = bytes_to_int(s[i+1..i+2])
         text = sprintf("retn %s",{asmhex(immediate)})
