@@ -75,15 +75,17 @@ public constant
     BH = 7, DI = 7, EDI = 7
 
 constant regs = {
-    {"al","ax","eax","es"},
-    {"cl","cx","ecx","cs"},
-    {"dl","dx","edx","ss"},
-    {"bl","bx","ebx","ds"},
-    {"ah","sp","esp","fs"},
-    {"ch","bp","ebp","gs"},
+    {"al","ax","eax"},
+    {"cl","cx","ecx"},
+    {"dl","dx","edx"},
+    {"bl","bx","ebx"},
+    {"ah","sp","esp"},
+    {"ch","bp","ebp"},
     {"dh","si","esi"},
     {"bh","di","edi"}
 }
+
+constant seg_regs = {"es","cs","ss","ds","fs","gs"}
 
 -- push
 public constant
@@ -112,7 +114,8 @@ public constant
 
 public constant
     XOR_RM_REG  = #30, -- + 2*dir + width
-    SUB_REG_RM  = #2B,
+    SUB_RM_REG  = #28, -- + 2*dir + width
+    SUB_REG_RM  = SUB_RM_REG+2, -- + width
     OP_RM_IMM   = #80,
     OP_RM_IMM32 = #80, -- + width
     OP_RM_IMM8  = #83,
@@ -477,14 +480,6 @@ function disasm(integer start_addr, sequence s, integer i=1)
         i = x[$]
         x = unify_operands(x)
         text = sprintf("lea %s, %s", {op_to_text(x[1]), op_to_text(x[2])})
-    elsif s[i] = SUB_REG_RM then
-        object x = analyse_modrm(s,i+1)
-        if atom(x) then
-            return x
-        end if
-        i = x[$]
-        x = unify_operands(x)
-        text = sprintf("sub %s, %s", {op_to_text(x[1]), op_to_text(x[2])})
     elsif and_bits(s[i],#FC) = OP_RM_IMM then
         integer flags = and_bits(s[i],3)
         if flags != 2 then
@@ -532,8 +527,8 @@ function disasm(integer start_addr, sequence s, integer i=1)
         end if
         i = x[$]
         x = unify_operands(x)
-        sequence reg
-        text = sprintf("mov %s, %s", swap({regs[x[1]+1][1+size*2-op_size], op_prefix & op_to_text(x[2])},not d))
+        sequence reg = regs[x[1]+1][1+size*2-op_size]
+        text = sprintf("mov %s, %s", swap({reg, op_prefix & op_to_text(x[2])},not d))
     elsif and_bits(s[i],#FE) = MOV_MEM_IMM8 then
         object x = analyse_modrm(s,i+1)
         integer size = and_bits(s[i],1)
@@ -571,7 +566,7 @@ function disasm(integer start_addr, sequence s, integer i=1)
         end if
         i = x[$]
         x = unify_operands(x)
-        text = sprintf("mov %s, %s", swap({regs[x[1]+1][4], op_prefix & op_to_text(x[2])}, not d))
+        text = sprintf("mov %s, %s", swap({seg_regs[x[1]+1], op_prefix & op_to_text(x[2])}, not d))
     elsif and_bits(s[i],#FC) = MOV_ACC_MEM then
         integer d = and_bits(s[i],2)
         if length(s)<i+4 then
@@ -580,6 +575,17 @@ function disasm(integer start_addr, sequence s, integer i=1)
         atom immediate = bytes_to_int(s[i+1..i+4])
         text = sprintf("mov %s, %s", swap({regs[EAX+1][3],op_prefix&'['&asmhex(immediate)&']'},d))
         i += 5
+    elsif and_bits(s[i],#FC) = SUB_RM_REG then -- @TODO: объединить код операций RM_REG
+        integer d = and_bits(s[i],2)
+        integer size = and_bits(s[i],1)
+        object x = analyse_modrm(s,i+1)
+        if atom(x) then
+            return x
+        end if
+        i = x[$]
+        x = unify_operands(x)
+        sequence reg = regs[x[1]+1][1+size*2-op_size]
+        text = sprintf("sub %s, %s", swap({reg, op_prefix & op_to_text(x[2])},not d))
     elsif and_bits(s[i],#FE) = CMP_ACC_IMM then
         integer size = and_bits(s[i],1)
         i += 1
