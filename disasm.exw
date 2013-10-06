@@ -19,12 +19,15 @@ constant
     sections = get_section_table(fn, pe_header),
     entry_point = fpeek4u(fn, pe_header+PE_ENTRY_POINT_RVA)
 
-constant n = #200
+constant n = #300
 sequence mach = fpeek(fn,{rva_to_off_ex(entry_point,sections[1]),n})
 
 integer i = 1
 while i <= length(mach)-10 do
-    sequence x = disasm(image_base+entry_point,mach,i)
+    object x = disasm(image_base+entry_point,mach,i)
+    if atom(x) then
+        exit
+    end if
     printf(1,"%08x\t%s\n",x[1..$-1])
     i = x[$]
 end while
