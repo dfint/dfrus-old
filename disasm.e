@@ -93,7 +93,7 @@ public constant
     PUSH_IMM32  = #68,
     PUSH_IMM8   = PUSH_IMM32 + 2,
     PUSH_INDIR  = {#FF,#30}, -- + размер смещение * 40h + базовый регистр [& SIB]
-    PUSHFD      = #9C,
+    PUSHFD      = #9C, POPFD = #9D,
     $
 
 public constant
@@ -402,7 +402,24 @@ constant op_sizes = {"byte","word","dword"}
 
 constant mnemo = {"add","or","adc","sbb","add","sub","xor","cmp"}
 
--- Опкоды с неизменяемой частью по маске #FC, флагом направления и размера операнда
+-- Опкоды однобайтовых операций без аргумнтов:
+sequence op_1byte_nomask_noargs = repeat(-1,256)
+op_1byte_nomask_noargs[NOP+1]           = "nop"
+op_1byte_nomask_noargs[RET_NEAR+1]      = "retn"
+op_1byte_nomask_noargs[PUSHFD+1]        = "pushfd"
+op_1byte_nomask_noargs[PUSHAD+1]        = "pushad"
+op_1byte_nomask_noargs[POPFD+1]         = "popfd"
+op_1byte_nomask_noargs[POPAD+1]         = "popad"
+op_1byte_nomask_noargs[LEAVE+1]         = "leave"
+op_1byte_nomask_noargs[INT3+1]          = "int3"
+
+-- Опкоды операций без маски
+sequence op_nomask = repeat(-1,256)
+op_nomask[CALL_NEAR+1] = "call near"
+op_nomask[JMP_NEAR+1]  = "jmp near"
+op_nomask[JMP_SHORT+1] = "jmp short"
+
+-- Опкоды с неизменяемой частью по маске #FC, флагами направления и размера операнда
 sequence op_FC_dir_width = repeat(-1,256)
 op_FC_dir_width[MOV_RM_REG+1] = "mov"
 op_FC_dir_width[SUB_RM_REG+1] = "sub"
@@ -431,39 +448,20 @@ function disasm(integer start_addr, sequence s, integer i=1)
         i += 1
     end if
     
-    if s[i] = NOP then
-        text = "nop"
-        i += 1
-    elsif s[i] = RET_NEAR then
-        text = "retn"
+    if sequence(op_1byte_nomask_noargs[s[i]+1]) then
+        text = op_1byte_nomask_noargs[s[i]+1]
         i += 1
     elsif s[i] = RET_NEAR_N then
-        text = "retn"
         integer immediate = bytes_to_int(s[i+1..i+2])
         text = sprintf("retn %s",{asmhex(immediate)})
         i += 3
-    elsif s[i] = PUSHFD then
-        text = "pushfd"
-        i += 1
-    elsif s[i] = LEAVE then
-        text = "leave"
-        i += 1
-    elsif s[i] = INT3 then
-        text = "int3"
-        i += 1
-    elsif s[i] = CALL_NEAR then
+    elsif s[i] = CALL_NEAR or s[i] = JMP_NEAR then
+        sequence mnemonix = op_nomask[s[i]+1]
         if length(s)<i+4 then
             return length(s)-(i+4)
         end if
         atom immediate = addr+5+check_sign_bit(bytes_to_int(s[i+1..i+4]),32)
-        text = sprintf("call near %s",{asmhex(immediate)})
-        i += 5
-    elsif s[i] = JMP_NEAR then
-        if length(s)<i+4 then
-            return length(s)-(i+4)
-        end if
-        atom immediate = addr+5+check_sign_bit(bytes_to_int(s[i+1..i+4]),32)
-        text = sprintf("jmp near %s",{asmhex(immediate)})
+        text = sprintf("%s %s",{mnemonix, asmhex(immediate)})
         i += 5
     elsif s[i] = JMP_SHORT then
         if length(s)<i+1 then
