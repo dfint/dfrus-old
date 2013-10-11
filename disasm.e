@@ -581,6 +581,7 @@ function disasm(integer start_addr, sequence s, integer i=1)
             return length(s)-(i+4)
         end if
         atom immediate = bytes_to_int(s[i+1..i+4])
+        -- @TODO: take in account operand size
         text = sprintf("mov %s, %s", swap({regs[EAX+1][3],op_prefix&'['&asmhex(immediate)&']'},d))
         i += 5
     elsif and_bits(s[i],#FE) = CMP_ACC_IMM then
@@ -588,6 +589,7 @@ function disasm(integer start_addr, sequence s, integer i=1)
         i += 1
         atom immediate
         sequence acc
+        -- @TODO: take in account operand size prefix
         if size then
             immediate = bytes_to_int(s[i..i+3])
             acc = "eax"
