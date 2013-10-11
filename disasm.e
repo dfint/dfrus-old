@@ -522,17 +522,16 @@ function disasm(integer start_addr, sequence s, integer i=1)
             
             i = x[$]
             x = unify_operands(x)
-            text = mnemonix & ' '
+            sequence size_spec = ""
             if not atom(x[2]) then
                 if flags = 0 then
-                    text &= "byte "
+                    size_spec = "byte "
                 elsif op_size = 1 then
-                    text &= "word "
+                    size_spec = "word "
                 else
-                    text &= "dword "
+                    size_spec = "dword "
                 end if
             end if
-            text &= op_to_text(x[2]) & ", "
             atom immediate
             if flags = 1 then
                 if length(s)<i+3 then
@@ -547,7 +546,7 @@ function disasm(integer start_addr, sequence s, integer i=1)
                 immediate = s[i]
                 i += 1
             end if
-            text &= asmhex(immediate)
+            text = sprintf("%s %s%s, %s", {mnemonix, size_spec, op_to_text(x[2]), asmhex(immediate)})
         end if
     elsif sequence(op_FE_width_REG_RM[and_bits(s[i],#FE)+1]) then
         -- Операция между регистром и регистром/памятью без флага направления
