@@ -402,6 +402,12 @@ constant op_sizes = {"byte","word","dword"}
 
 constant mnemo = {"add","or","adc","sbb","add","sub","xor","cmp"}
 
+-- Опкоды с неизменяемой частью по маске #FC, флагом направления и размера операнда
+sequence op_FC_dir_width = repeat(-1,256)
+op_FC_dir_width[MOV_RM_REG+1] = "mov"
+op_FC_dir_width[SUB_RM_REG+1] = "sub"
+op_FC_dir_width[XOR_RM_REG+1] = "xor"
+
 -- Набросок функции, по введенному машинному коду возвращающей его ассемблерное представление
 public
 function disasm(integer start_addr, sequence s, integer i=1)
@@ -520,7 +526,9 @@ function disasm(integer start_addr, sequence s, integer i=1)
             end if
             text &= asmhex(immediate)
         end if
-    elsif and_bits(s[i],#FC) = MOV_RM_REG then
+    elsif sequence(op_FC_dir_width[and_bits(s[i],#FC)+1]) then
+        -- Операция между регистром и регистром/памятью с флагом направления
+        sequence mnemonix = op_FC_dir_width[and_bits(s[i],#FC)+1]
         integer d = and_bits(s[i],2)
         integer size = and_bits(s[i],1)
         object x = analyse_modrm(s,i+1)
@@ -530,7 +538,7 @@ function disasm(integer start_addr, sequence s, integer i=1)
         i = x[$]
         x = unify_operands(x)
         sequence reg = regs[x[1]+1][1+size*2-op_size]
-        text = sprintf("mov %s, %s", swap({reg, op_prefix & op_to_text(x[2])},not d))
+        text = sprintf("%s %s, %s", {mnemonix} & swap({reg, op_prefix & op_to_text(x[2])}, not d))
     elsif and_bits(s[i],#FE) = MOV_MEM_IMM8 then
         object x = analyse_modrm(s,i+1)
         integer size = and_bits(s[i],1)
@@ -577,17 +585,6 @@ function disasm(integer start_addr, sequence s, integer i=1)
         atom immediate = bytes_to_int(s[i+1..i+4])
         text = sprintf("mov %s, %s", swap({regs[EAX+1][3],op_prefix&'['&asmhex(immediate)&']'},d))
         i += 5
-    elsif and_bits(s[i],#FC) = SUB_RM_REG then -- @TODO: объединить код операций RM_REG
-        integer d = and_bits(s[i],2)
-        integer size = and_bits(s[i],1)
-        object x = analyse_modrm(s,i+1)
-        if atom(x) then
-            return x
-        end if
-        i = x[$]
-        x = unify_operands(x)
-        sequence reg = regs[x[1]+1][1+size*2-op_size]
-        text = sprintf("sub %s, %s", swap({reg, op_prefix & op_to_text(x[2])},not d))
     elsif and_bits(s[i],#FE) = CMP_ACC_IMM then
         integer size = and_bits(s[i],1)
         i += 1
@@ -616,14 +613,6 @@ function disasm(integer start_addr, sequence s, integer i=1)
             i += 1
         end if
         text = sprintf("mov %s, %s", {regs[reg+1][1+size*2], asmhex(immediate)})
-    elsif and_bits(s[i],#FC) = XOR_RM_REG then
-        object x = analyse_modrm(s,i+1)
-        if atom(x) then
-            return x
-        end if
-        i = x[$]
-        x = unify_operands(x)
-        text = sprintf("xor %s, %s", {op_to_text(x[1]), op_to_text(x[2])})
     elsif and_bits(s[i],#F8) = PUSH_REG then
         integer reg = and_bits(s[i],7)
         text = sprintf("push %s",{regs[reg+1][3]})
