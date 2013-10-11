@@ -141,6 +141,10 @@ public constant MOVZX = {#0F,#B6}, MOVSX = {#0F,#BE}
 
 public constant MOVSB = #A4, MOVSD = #A5, MOVSW = PREFIX_OPERAND_SIZE & MOVSD
 
+public constant INC_REG = #40, -- + reg
+                DEC_REG = #48, -- + reg
+                $
+
 -- Разбить байт на триады
 public
 function triads(integer x)
@@ -439,6 +443,12 @@ sequence op_FE_width_REG_RM = repeat(-1,256)
 op_FE_width_REG_RM[TEST_RM_REG+1] = "test"
 op_FE_width_REG_RM[XCHG_RM_REG+1] = "xchg"
 
+sequence op_F8_reg = repeat(-1,256)
+op_F8_reg[PUSH_REG+1] = "push"
+op_F8_reg[POP_REG+1]  = "pop"
+op_F8_reg[INC_REG+1]  = "inc"
+op_F8_reg[DEC_REG+1]  = "dec"
+
 -- Набросок функции, по введенному машинному коду возвращающей его ассемблерное представление
 public
 function disasm(integer start_addr, sequence s, integer i=1)
@@ -640,9 +650,10 @@ function disasm(integer start_addr, sequence s, integer i=1)
             i += 1
         end if
         text = sprintf("mov %s, %s", {regs[reg+1][1+size*2], asmhex(immediate)})
-    elsif and_bits(s[i],#F8) = PUSH_REG then
+    elsif sequence(op_F8_reg[and_bits(s[i],#F8)+1]) then
+        sequence mnemonix = op_F8_reg[and_bits(s[i],#F8)+1]
         integer reg = and_bits(s[i],7)
-        text = sprintf("push %s",{regs[reg+1][3]})
+        text = sprintf("%s %s",{mnemonix, regs[reg+1][3]})
         i += 1
     elsif and_bits(s[i],#FD) = PUSH_IMM32 then
         integer size = and_bits(s[i],2)
@@ -661,10 +672,6 @@ function disasm(integer start_addr, sequence s, integer i=1)
             i += 5
         end if
         text = sprintf("push %s",{asmhex(immediate)})
-    elsif and_bits(s[i],#F8) = POP_REG then
-        integer reg = and_bits(s[i],7)
-        text = sprintf("pop %s",{regs[reg+1][3]})
-        i += 1
     elsif s[i] = POP_RM then
         object x = analyse_modrm(s,i+1)
         if atom(x) then
