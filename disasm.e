@@ -703,6 +703,24 @@ function disasm(integer start_addr, sequence s, integer i=1)
             sequence reg = regs[and_bits(s[i+1],7)][1] -- 8bit regs
             text = sprintf("set%s %s",{conds[condition+1],reg})
             i += 2
+        elsif find(and_bits(s[i],#FE), {MOVZX[2], MOVSX[2]}) then
+            integer op = and_bits(s[i],#FE)
+            integer size = and_bits(s[i],1)
+            object x = analyse_modrm(s,i+1)
+            if atom(x) then
+                return x
+            end if
+            i = x[$]
+            x = unify_operands(x)
+            sequence reg = regs[x[1]+1][1+size*2]
+            sequence size_spec = op_sizes[size+1]
+            sequence mnemonix
+            if op=MOVZX[2] then
+                mnemonix = "movzx"
+            else
+                mnemonix = "movsx"
+            end if
+            text = sprintf("%s %s, %s %s", {mnemonix, reg, size_spec, op_to_text(x[2])})
         end if
     end if
     
