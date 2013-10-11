@@ -27,6 +27,9 @@ public constant
     JCC_NEAR  = {#0F,#80} -- + {0,cond}
 
 public constant
+    SETCC = {#0F,#90} -- + {0,cond}, modrm
+
+public constant
     CMP_RM_IMM = #80,
     CMP_RM_REG = #38, -- + 2*dir + width
     CMP_ACC_IMM = #3C, -- + width
@@ -120,6 +123,7 @@ public constant
     XOR_RM_REG  = #30, -- + 2*dir + width
     SUB_RM_REG  = #28, -- + 2*dir + width
     SUB_REG_RM  = SUB_RM_REG+2, -- + width
+    ADD_RM_REG  = #00, -- + 2*dir + width
     OP_RM_IMM   = #80,
     OP_RM_IMM32 = #80, -- + width
     OP_RM_IMM8  = #83,
@@ -356,7 +360,6 @@ function unify_operands(sequence x)
 end function
 
 function op_to_text(object op)
-    -- ? op
     sequence text
     if atom(op) then
         text = regs[op+1][3]
@@ -424,8 +427,10 @@ op_nomask[JMP_NEAR+1]  = "jmp near"
 op_nomask[JMP_SHORT+1] = "jmp short"
 
 -- ќпкоды с неизмен€емой частью по маске #FC, флагами направлени€ и размера операнда
+-- по идее было бы достаточно 65 элемента, т.к. провер€ютс€ только старшие 6 бит
 sequence op_FC_dir_width_REG_RM = repeat(-1,256)
 op_FC_dir_width_REG_RM[MOV_RM_REG+1] = "mov"
+op_FC_dir_width_REG_RM[ADD_RM_REG+1] = "add"
 op_FC_dir_width_REG_RM[SUB_RM_REG+1] = "sub"
 op_FC_dir_width_REG_RM[XOR_RM_REG+1] = "xor"
 op_FC_dir_width_REG_RM[CMP_RM_REG+1] = "cmp"
@@ -494,7 +499,8 @@ function disasm(integer start_addr, sequence s, integer i=1)
         end if
         i = x[$]
         x = unify_operands(x)
-        text = sprintf("lea %s, %s", {op_to_text(x[1]), op_to_text(x[2])})
+        sequence reg = regs[x[1]+1][3]
+        text = sprintf("lea %s, %s", {reg, op_to_text(x[2])})
     elsif and_bits(s[i],#FC) = OP_RM_IMM then
         integer flags = and_bits(s[i],3)
         if flags != 2 then
@@ -689,6 +695,14 @@ function disasm(integer start_addr, sequence s, integer i=1)
             i = x[$]
             x = unify_operands(x)
             text = sprintf("call dword %s%s", {op_prefix, op_to_text(x[2])})
+        end if
+    elsif s[i] = #0F then
+        i += 1
+        if and_bits(s[i],#F8)=SETCC[2] and and_bits(s[i+1],#C0)=#C0 then
+            integer condition = and_bits(s[i],7)
+            sequence reg = regs[and_bits(s[i+1],7)][1] -- 8bit regs
+            text = sprintf("set%s %s",{conds[condition+1],reg})
+            i += 2
         end if
     end if
     
