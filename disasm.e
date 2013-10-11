@@ -27,7 +27,11 @@ public constant
     JCC_NEAR  = {#0F,#80} -- + {0,cond}
 
 public constant
-    CMP_RM_IMM = #80
+    CMP_RM_IMM = #80,
+    CMP_RM_REG = #38, -- + 2*dir + width
+    CMP_ACC_IMM = #3C, -- + width
+    TEST_RM_REG = #84, -- + width
+    $
 
 public constant
     CALL_NEAR   = #E8,
@@ -122,7 +126,7 @@ public constant
     $
 
 public constant
-    CMP_ACC_IMM = #3C, -- + width
+    XCHG_RM_REG = #86, -- + width
     $
 
 public constant LEA = #8D
@@ -404,14 +408,14 @@ constant mnemo = {"add","or","adc","sbb","add","sub","xor","cmp"}
 
 -- Опкоды однобайтовых операций без аргумнтов:
 sequence op_1byte_nomask_noargs = repeat(-1,256)
-op_1byte_nomask_noargs[NOP+1]           = "nop"
-op_1byte_nomask_noargs[RET_NEAR+1]      = "retn"
-op_1byte_nomask_noargs[PUSHFD+1]        = "pushfd"
-op_1byte_nomask_noargs[PUSHAD+1]        = "pushad"
-op_1byte_nomask_noargs[POPFD+1]         = "popfd"
-op_1byte_nomask_noargs[POPAD+1]         = "popad"
-op_1byte_nomask_noargs[LEAVE+1]         = "leave"
-op_1byte_nomask_noargs[INT3+1]          = "int3"
+op_1byte_nomask_noargs[NOP+1]      = "nop"
+op_1byte_nomask_noargs[RET_NEAR+1] = "retn"
+op_1byte_nomask_noargs[PUSHFD+1]   = "pushfd"
+op_1byte_nomask_noargs[PUSHAD+1]   = "pushad"
+op_1byte_nomask_noargs[POPFD+1]    = "popfd"
+op_1byte_nomask_noargs[POPAD+1]    = "popad"
+op_1byte_nomask_noargs[LEAVE+1]    = "leave"
+op_1byte_nomask_noargs[INT3+1]     = "int3"
 
 -- Опкоды операций без маски
 sequence op_nomask = repeat(-1,256)
@@ -420,10 +424,15 @@ op_nomask[JMP_NEAR+1]  = "jmp near"
 op_nomask[JMP_SHORT+1] = "jmp short"
 
 -- Опкоды с неизменяемой частью по маске #FC, флагами направления и размера операнда
-sequence op_FC_dir_width = repeat(-1,256)
-op_FC_dir_width[MOV_RM_REG+1] = "mov"
-op_FC_dir_width[SUB_RM_REG+1] = "sub"
-op_FC_dir_width[XOR_RM_REG+1] = "xor"
+sequence op_FC_dir_width_REG_RM = repeat(-1,256)
+op_FC_dir_width_REG_RM[MOV_RM_REG+1] = "mov"
+op_FC_dir_width_REG_RM[SUB_RM_REG+1] = "sub"
+op_FC_dir_width_REG_RM[XOR_RM_REG+1] = "xor"
+op_FC_dir_width_REG_RM[CMP_RM_REG+1] = "cmp"
+
+sequence op_FE_width_REG_RM = repeat(-1,256)
+op_FE_width_REG_RM[TEST_RM_REG+1] = "test"
+op_FE_width_REG_RM[XCHG_RM_REG+1] = "xchg"
 
 -- Набросок функции, по введенному машинному коду возвращающей его ассемблерное представление
 public
@@ -524,9 +533,21 @@ function disasm(integer start_addr, sequence s, integer i=1)
             end if
             text &= asmhex(immediate)
         end if
-    elsif sequence(op_FC_dir_width[and_bits(s[i],#FC)+1]) then
+    elsif sequence(op_FE_width_REG_RM[and_bits(s[i],#FE)+1]) then
+        -- Операция между регистром и регистром/памятью без флага направления
+        sequence mnemonix = op_FE_width_REG_RM[and_bits(s[i],#FE)+1]
+        integer size = and_bits(s[i],1)
+        object x = analyse_modrm(s,i+1)
+        if atom(x) then
+            return x
+        end if
+        i = x[$]
+        x = unify_operands(x)
+        sequence reg = regs[x[1]+1][1+size*2-op_size]
+        text = sprintf("%s %s, %s", {mnemonix, reg, op_prefix & op_to_text(x[2])})
+    elsif sequence(op_FC_dir_width_REG_RM[and_bits(s[i],#FC)+1]) then
         -- Операция между регистром и регистром/памятью с флагом направления
-        sequence mnemonix = op_FC_dir_width[and_bits(s[i],#FC)+1]
+        sequence mnemonix = op_FC_dir_width_REG_RM[and_bits(s[i],#FC)+1]
         integer d = and_bits(s[i],2)
         integer size = and_bits(s[i],1)
         object x = analyse_modrm(s,i+1)
