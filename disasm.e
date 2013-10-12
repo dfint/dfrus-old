@@ -34,6 +34,7 @@ public constant
     CMP_RM_REG = #38, -- + 2*dir + width
     CMP_ACC_IMM = #3C, -- + width
     TEST_RM_REG = #84, -- + width
+    TEST_ACC_IMM = #A8, -- + width
     $
 
 public constant
@@ -120,12 +121,12 @@ public constant
     $
 
 public constant
-    XOR_RM_REG  = #30, -- + 2*dir + width
+    ADD_RM_REG  = #00, -- + 2*dir + width
+    ADD_ACC_IMM = #04, -- + width
     SUB_RM_REG  = #28, -- + 2*dir + width
     SUB_REG_RM  = SUB_RM_REG+2, -- + width
     SUB_ACC_IMM = #2C, -- + width
-    ADD_RM_REG  = #00, -- + 2*dir + width
-    ADD_ACC_IMM = #04, -- + width
+    XOR_RM_REG  = #30, -- + 2*dir + width
     OP_RM_IMM   = #80,
     OP_RM_IMM32 = #80, -- + width
     OP_RM_IMM8  = #83,
@@ -146,6 +147,12 @@ public constant MOVSB = #A4, MOVSD = #A5, MOVSW = PREFIX_OPERAND_SIZE & MOVSD
 public constant INC_REG = #40, -- + reg
                 DEC_REG = #48, -- + reg
                 $
+
+public constant
+    SHIFT_OP_RM_1    = #D0, -- + width
+    SHIFT_OP_RM_CL   = #D2, -- + width
+    SHIFT_OP_RM_IMM8 = #C0, -- + width
+    $
 
 -- Разбить байт на триады
 public
@@ -433,7 +440,7 @@ op_nomask[JMP_NEAR+1]  = "jmp near"
 op_nomask[JMP_SHORT+1] = "jmp short"
 
 -- Опкоды с неизменяемой частью по маске #FC, флагами направления и размера операнда
--- по идее было бы достаточно 65 элемента, т.к. проверяются только старшие 6 бит
+-- по идее было бы достаточно 64 элемента, т.к. проверяются только старшие 6 бит
 sequence op_FC_dir_width_REG_RM = repeat(-1,256)
 op_FC_dir_width_REG_RM[MOV_RM_REG+1] = "mov"
 op_FC_dir_width_REG_RM[ADD_RM_REG+1] = "add"
@@ -453,8 +460,11 @@ op_F8_reg[DEC_REG+1]  = "dec"
 
 sequence op_FE_width_acc_imm = repeat(-1,256)
 op_FE_width_acc_imm[CMP_ACC_IMM+1] = "cmp"
+op_FE_width_acc_imm[TEST_ACC_IMM+1] = "test"
 op_FE_width_acc_imm[ADD_ACC_IMM+1] = "add"
 op_FE_width_acc_imm[SUB_ACC_IMM+1] = "sub"
+
+sequence shifts_rolls = {"rol","ror","rcl","rcr","shl","shr","sal","sar"}
 
 -- Набросок функции, по введенному машинному коду возвращающей его ассемблерное представление
 public
@@ -665,6 +675,27 @@ function disasm(integer start_addr, sequence s, integer i=1)
         integer reg = and_bits(s[i],7)
         text = sprintf("%s %s",{mnemonix, regs[reg+1][3]})
         i += 1
+    elsif find(and_bits(s[i],#FE),{SHIFT_OP_RM_1,SHIFT_OP_RM_CL,SHIFT_OP_RM_IMM8}) then
+        integer opcode = and_bits(s[i],#FE)
+        integer size = and_bits(s[i],1)
+        object x = analyse_modrm(s,i+1)
+        if atom(x) then
+            return x
+        end if
+        i = x[$]
+        x = unify_operands(x)
+        sequence mnemonix = shifts_rolls[x[1]+1]
+        sequence op2
+        if opcode = SHIFT_OP_RM_1 then
+            op2 = "1"
+        elsif opcode = SHIFT_OP_RM_CL then
+            op2 = "cl"
+        else
+            integer immediate = s[i]
+            op2 = asmhex(immediate)
+            i += 1
+        end if
+        text = sprintf("%s %s, %s",{mnemonix,op_to_text(x[2]),op2})
     elsif and_bits(s[i],#FD) = PUSH_IMM32 then
         integer size = and_bits(s[i],2)
         atom immediate
