@@ -420,7 +420,7 @@ end function
 constant seg_tags = {"cs:","ds:","es:","ss:","fs:","gs:"}
 constant op_sizes = {"byte","word","dword"}
 
-constant mnemo = {"add","or","adc","sbb","add","sub","xor","cmp"}
+constant mnemo = {"add","or","adc","sbb","and","sub","xor","cmp"}
 
 -- Опкоды однобайтовых операций без аргумнтов:
 sequence op_1byte_nomask_noargs = repeat(-1,256)
