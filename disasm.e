@@ -123,7 +123,9 @@ public constant
     XOR_RM_REG  = #30, -- + 2*dir + width
     SUB_RM_REG  = #28, -- + 2*dir + width
     SUB_REG_RM  = SUB_RM_REG+2, -- + width
+    SUB_ACC_IMM = #2C, -- + width
     ADD_RM_REG  = #00, -- + 2*dir + width
+    ADD_ACC_IMM = #04, -- + width
     OP_RM_IMM   = #80,
     OP_RM_IMM32 = #80, -- + width
     OP_RM_IMM8  = #83,
@@ -449,6 +451,11 @@ op_F8_reg[POP_REG+1]  = "pop"
 op_F8_reg[INC_REG+1]  = "inc"
 op_F8_reg[DEC_REG+1]  = "dec"
 
+sequence op_FE_width_acc_imm = repeat(-1,256)
+op_FE_width_acc_imm[CMP_ACC_IMM+1] = "cmp"
+op_FE_width_acc_imm[ADD_ACC_IMM+1] = "add"
+op_FE_width_acc_imm[SUB_ACC_IMM+1] = "sub"
+
 -- Набросок функции, по введенному машинному коду возвращающей его ассемблерное представление
 public
 function disasm(integer start_addr, sequence s, integer i=1)
@@ -620,22 +627,26 @@ function disasm(integer start_addr, sequence s, integer i=1)
         -- @TODO: take in account operand size
         text = sprintf("mov %s, %s", swap({regs[EAX+1][3],op_prefix&'['&asmhex(immediate)&']'},d))
         i += 5
-    elsif and_bits(s[i],#FE) = CMP_ACC_IMM then
+    elsif sequence(op_FE_width_acc_imm[and_bits(s[i],#FE)+1]) then
+        sequence mnemonix = op_FE_width_acc_imm[and_bits(s[i],#FE)+1]
         integer size = and_bits(s[i],1)
         i += 1
         atom immediate
         sequence acc
-        -- @TODO: take in account operand size prefix
-        if size then
-            immediate = bytes_to_int(s[i..i+3])
-            acc = "eax"
-            i += 4
-        else
+        if size=0 then
             immediate = s[i]
             acc = "al"
             i += 1
+        elsif op_size=1 then
+            immediate = bytes_to_int(s[i..i+1])
+            acc = "ax"
+            i += 2
+        else
+            immediate = bytes_to_int(s[i..i+3])
+            acc = "eax"
+            i += 4
         end if
-        text = sprintf("cmp %s, %s", {acc, asmhex(immediate)})
+        text = sprintf("%s %s, %s", {mnemonix, acc, asmhex(immediate)})
     elsif and_bits(s[i],#F0) = MOV_REG_IMM then
         integer size = and_bits(s[i],8)/8
         integer reg = and_bits(s[i],7)
