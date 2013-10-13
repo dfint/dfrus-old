@@ -122,6 +122,7 @@ public constant
 
 public constant
     XCHG_RM_REG = #86, -- + width
+    XCHG_ACC_REG = #90, -- + reg -- no width bit, so only eax and ax are acceptable
     $
 
 public constant LEA = #8D
