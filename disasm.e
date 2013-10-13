@@ -571,9 +571,9 @@ function disasm(integer start_addr, sequence s, integer i=1)
         end if
         i = x[$]
         x = unify_operands(x)
-        if x[1]=>2 then -- unary operations: not, neg, mul, imul etc.
+        if x[1]>=2 then -- unary operations: not, neg, mul, imul etc.
             sequence mnemos = {0,0,"not","neg","mul","imul","div","idiv"}
-            sequence mnemonix = mnemos[x[i]+1]
+            sequence mnemonix = mnemos[x[1]+1]
             if sequence(x[2]) then
                 sequence size_spec
                 if size=0 then
