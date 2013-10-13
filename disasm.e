@@ -320,7 +320,6 @@ op_F8_reg[PUSH_REG+1] = "push"
 op_F8_reg[POP_REG+1]  = "pop"
 op_F8_reg[INC_REG+1]  = "inc"
 op_F8_reg[DEC_REG+1]  = "dec"
-op_F8_reg[#90+1] = "xchg eax,"
 
 sequence op_FE_width_acc_imm = repeat(-1,256)
 op_FE_width_acc_imm[ADD_ACC_IMM+1] = "add"
@@ -411,6 +410,7 @@ function disasm(integer start_addr, sequence s, integer i=1)
             x = unify_operands(x)
             sequence size_spec = ""
             if not atom(x[2]) then
+                -- @TODO: перенести эту функциональность в op_to_text
                 if flags = 0 then
                     size_spec = "byte "
                 elsif size_prefix = 1 then
@@ -543,7 +543,11 @@ function disasm(integer start_addr, sequence s, integer i=1)
     elsif sequence(op_F8_reg[and_bits(s[i],#F8)+1]) then
         sequence mnemonix = op_F8_reg[and_bits(s[i],#F8)+1]
         integer reg = and_bits(s[i],7)
-        text = sprintf("%s %s",{mnemonix, regs[reg+1][3]})
+        text = sprintf("%s %s",{mnemonix, regs[reg+1][3-size_prefix]})
+        i += 1
+    elsif and_bits(s[i],#F8)=XCHG_ACC_REG and s[i]!=NOP then -- actually nop is already handled
+        integer reg = and_bits(s[i],7)
+        text = sprintf("xchg %s, %s",{regs[EAX+1][3-size_prefix], regs[reg+1][3-size_prefix]})
         i += 1
     elsif find(and_bits(s[i],#FE),{SHIFT_OP_RM_1,SHIFT_OP_RM_CL,SHIFT_OP_RM_IMM8}) then
         integer opcode = and_bits(s[i],#FE)
