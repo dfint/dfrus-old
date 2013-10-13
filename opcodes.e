@@ -22,7 +22,7 @@ public constant
 public constant
     JMP_NEAR  = #E9,
     JMP_SHORT = JMP_NEAR+2,
-    JMP_INDIR = {#0F,#25},
+    JMP_INDIR = {#FF,#20},
     JCC_SHORT = #70, -- + cond
     JCC_NEAR  = {#0F,#80} -- + {0,cond}
 
@@ -100,8 +100,7 @@ public constant
     MOV_ACC_MEM = #A0, -- + 2*dir + width
     MOV_RM_REG  = #88, -- + 2*dir + width
     MOV_REG_RM  = MOV_RM_REG+2, -- + width
-    MOV_MEM_IMM8 = #C6,
-    MOV_MEM_IMM = MOV_MEM_IMM8+1,
+    MOV_RM_IMM  = #C6, -- + width
     MOV_RM_SEG  = #8C, -- + 2*dir
     $
 
@@ -118,7 +117,6 @@ public constant
     AND_RM_REG  = #20, -- + 2*dir + width
     AND_ACC_IMM = #24, -- + width
     OP_RM_IMM   = #80,
-    OP_RM_IMM32 = #80, -- + width
     OP_RM_IMM8  = #83,
     $
 
