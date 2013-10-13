@@ -127,6 +127,11 @@ public constant
     SUB_REG_RM  = SUB_RM_REG+2, -- + width
     SUB_ACC_IMM = #2C, -- + width
     XOR_RM_REG  = #30, -- + 2*dir + width
+    XOR_ACC_IMM = #34, -- + width
+    OR_RM_REG   = #08, -- + 2*dir + width
+    OR_ACC_IMM  = #0C, -- + width
+    AND_RM_REG  = #20, -- + 2*dir + width
+    AND_ACC_IMM = #24, -- + width
     OP_RM_IMM   = #80,
     OP_RM_IMM32 = #80, -- + width
     OP_RM_IMM8  = #83,
@@ -445,6 +450,8 @@ sequence op_FC_dir_width_REG_RM = repeat(-1,256)
 op_FC_dir_width_REG_RM[MOV_RM_REG+1] = "mov"
 op_FC_dir_width_REG_RM[ADD_RM_REG+1] = "add"
 op_FC_dir_width_REG_RM[SUB_RM_REG+1] = "sub"
+op_FC_dir_width_REG_RM[OR_RM_REG+1]  = "or"
+op_FC_dir_width_REG_RM[AND_RM_REG+1] = "and"
 op_FC_dir_width_REG_RM[XOR_RM_REG+1] = "xor"
 op_FC_dir_width_REG_RM[CMP_RM_REG+1] = "cmp"
 
@@ -459,10 +466,13 @@ op_F8_reg[INC_REG+1]  = "inc"
 op_F8_reg[DEC_REG+1]  = "dec"
 
 sequence op_FE_width_acc_imm = repeat(-1,256)
-op_FE_width_acc_imm[CMP_ACC_IMM+1] = "cmp"
-op_FE_width_acc_imm[TEST_ACC_IMM+1] = "test"
 op_FE_width_acc_imm[ADD_ACC_IMM+1] = "add"
 op_FE_width_acc_imm[SUB_ACC_IMM+1] = "sub"
+op_FE_width_acc_imm[OR_ACC_IMM+1]  = "or"
+op_FE_width_acc_imm[AND_ACC_IMM+1] = "and"
+op_FE_width_acc_imm[XOR_ACC_IMM+1] = "xor"
+op_FE_width_acc_imm[CMP_ACC_IMM+1] = "cmp"
+op_FE_width_acc_imm[TEST_ACC_IMM+1] = "test"
 
 sequence shifts_rolls = {"rol","ror","rcl","rcr","shl","shr","sal","sar"}
 
