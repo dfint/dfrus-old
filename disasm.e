@@ -281,8 +281,6 @@ end function
 constant seg_tags = {"cs:","ds:","es:","ss:","fs:","gs:"}
 constant op_sizes = {"byte","word","dword"}
 
-constant mnemo = {"add","or","adc","sbb","and","sub","xor","cmp"}
-
 -- Опкоды однобайтовых операций без аргумнтов:
 sequence op_1byte_nomask_noargs = repeat(-1,256)
 op_1byte_nomask_noargs[NOP+1]      = "nop"
@@ -310,6 +308,8 @@ op_FC_dir_width_REG_RM[OR_RM_REG+1]  = "or"
 op_FC_dir_width_REG_RM[AND_RM_REG+1] = "and"
 op_FC_dir_width_REG_RM[XOR_RM_REG+1] = "xor"
 op_FC_dir_width_REG_RM[CMP_RM_REG+1] = "cmp"
+op_FC_dir_width_REG_RM[#10+1] = "adc"
+op_FC_dir_width_REG_RM[#18+1] = "sbb"
 
 sequence op_FE_width_REG_RM = repeat(-1,256)
 op_FE_width_REG_RM[TEST_RM_REG+1] = "test"
@@ -329,6 +329,8 @@ op_FE_width_acc_imm[AND_ACC_IMM+1] = "and"
 op_FE_width_acc_imm[XOR_ACC_IMM+1] = "xor"
 op_FE_width_acc_imm[CMP_ACC_IMM+1] = "cmp"
 op_FE_width_acc_imm[TEST_ACC_IMM+1] = "test"
+op_FE_width_acc_imm[#14+1] = "adc"
+op_FE_width_acc_imm[#1C+1] = "sbb"
 
 sequence shifts_rolls = {"rol","ror","rcl","rcr","shl","shr","sal","sar"}
 
@@ -396,9 +398,10 @@ function disasm(integer start_addr, sequence s, integer i=1)
         text = sprintf("lea %s, %s", {reg, op_to_text(x[2])})
     elsif and_bits(s[i],#FC) = OP_RM_IMM then
         integer flags = and_bits(s[i],3)
+        sequence mnemos = {"add","or","adc","sbb","and","sub","xor","cmp"}
         if flags != 2 then
             object x = analyse_modrm(s,i+1)
-            sequence mnemonix = mnemo[x[1][2]+1]
+            sequence mnemonix = mnemos[x[1][2]+1]
             if atom(x) then
                 return x
             end if
