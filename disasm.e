@@ -339,7 +339,7 @@ function disasm(integer start_addr, sequence s, integer i=1)
     integer j = i
     integer addr = start_addr+i-1
     integer seg
-    integer op_size = 0
+    integer prefix_size = 0
     -- sequence prefixes = {}
     -- Прежде всего, нужно разобрать префиксы. Некоторые префиксы (REP, например) можно отображать как отдельные инструкции
     seg = find(s[i],{SEG_CS,SEG_DS,SEG_ES,SEG_SS,SEG_FS,SEG_GS})
@@ -351,7 +351,7 @@ function disasm(integer start_addr, sequence s, integer i=1)
     
     if s[i]=PREFIX_OPERAND_SIZE then
         -- prefixes = prepend(prefixes, s[i])
-        op_size = 1
+        prefix_size = 1
         i += 1
     end if
     
@@ -409,7 +409,7 @@ function disasm(integer start_addr, sequence s, integer i=1)
             if not atom(x[2]) then
                 if flags = 0 then
                     size_spec = "byte "
-                elsif op_size = 1 then
+                elsif prefix_size = 1 then
                     size_spec = "word "
                 else
                     size_spec = "dword "
@@ -441,7 +441,7 @@ function disasm(integer start_addr, sequence s, integer i=1)
         end if
         i = x[$]
         x = unify_operands(x)
-        sequence reg = regs[x[1]+1][1+size*2-op_size]
+        sequence reg = regs[x[1]+1][1+size*2-prefix_size]
         text = sprintf("%s %s, %s", {mnemonix, reg, op_prefix & op_to_text(x[2])})
     elsif sequence(op_FC_dir_width_REG_RM[and_bits(s[i],#FC)+1]) then
         -- Операция между регистром и регистром/памятью с флагом направления
@@ -454,7 +454,7 @@ function disasm(integer start_addr, sequence s, integer i=1)
         end if
         i = x[$]
         x = unify_operands(x)
-        sequence reg = regs[x[1]+1][1+size*2-op_size]
+        sequence reg = regs[x[1]+1][1+size*2-prefix_size]
         text = sprintf("%s %s, %s", {mnemonix} & swap({reg, op_prefix & op_to_text(x[2])}, not d))
     elsif and_bits(s[i],#FE) = MOV_MEM_IMM8 then
         object x = analyse_modrm(s,i+1)
@@ -474,7 +474,7 @@ function disasm(integer start_addr, sequence s, integer i=1)
                 immediate = s[i]
                 size_spec = "byte"
                 i += 1
-            elsif op_size = 1 then
+            elsif prefix_size = 1 then
                 immediate = bytes_to_int(s[i..i+1])
                 size_spec = "word"
                 i += 2
@@ -513,7 +513,7 @@ function disasm(integer start_addr, sequence s, integer i=1)
             immediate = s[i]
             acc = "al"
             i += 1
-        elsif op_size=1 then
+        elsif prefix_size=1 then
             immediate = bytes_to_int(s[i..i+1])
             acc = "ax"
             i += 2
@@ -562,6 +562,56 @@ function disasm(integer start_addr, sequence s, integer i=1)
             i += 1
         end if
         text = sprintf("%s %s, %s",{mnemonix,op_to_text(x[2]),op2})
+    elsif and_bits(s[i],#FE)=TEST_or_unary_RM then
+        integer size = and_bits(s[i],1)
+        i += 1
+        object x = analyse_modrm(s,i)
+        if atom(x) then
+            return x
+        end if
+        i = x[$]
+        x = unify_operands(x)
+        if x[1]=>2 then -- unary operations: not, neg, mul, imul etc.
+            sequence mnemos = {0,0,"not","neg","mul","imul","div","idiv"}
+            sequence mnemonix = mnemos[x[i]+1]
+            if sequence(x[2]) then
+                sequence size_spec
+                if size=0 then
+                    size_spec = "byte"
+                elsif prefix_size=1 then
+                    size_spec = "word"
+                else
+                    size_spec = "dword"
+                end if
+                text = sprintf("%s %s %s",{mnemonix, size_spec, op_to_text(x[2])})
+            else
+                sequence reg = regs[x[2]+1][1+size*2-prefix_size]
+                text = sprintf("%s %s",{mnemonix, reg})
+            end if
+        elsif x[1]=0 then -- test r/m, imm
+            sequence size_spec
+            atom immediate
+            if size=0 then
+                size_spec = "byte"
+                immediate = s[i]
+                i += 1
+            elsif prefix_size=1 then
+                size_spec = "word"
+                immediate = bytes_to_int(s[i..i+1])
+                i += 2
+            else
+                size_spec = "dword"
+                immediate = bytes_to_int(s[i..i+3])
+                i += 4
+            end if
+            
+            if atom(x[2]) then
+                sequence reg = regs[x[2]+1][1+size*2-prefix_size]
+                text = sprintf("test %s, %s",{reg,asmhex(immediate)})
+            else
+                text = sprintf("test %s %s, %s",{size_spec,op_to_text(x[2]),asmhex(immediate)})
+            end if
+        end if
     elsif and_bits(s[i],#FD) = PUSH_IMM32 then
         integer size = and_bits(s[i],2)
         atom immediate
