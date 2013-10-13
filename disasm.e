@@ -320,6 +320,7 @@ op_F8_reg[PUSH_REG+1] = "push"
 op_F8_reg[POP_REG+1]  = "pop"
 op_F8_reg[INC_REG+1]  = "inc"
 op_F8_reg[DEC_REG+1]  = "dec"
+op_F8_reg[#90+1] = "xchg eax,"
 
 sequence op_FE_width_acc_imm = repeat(-1,256)
 op_FE_width_acc_imm[ADD_ACC_IMM+1] = "add"
@@ -437,31 +438,31 @@ function disasm(integer start_addr, sequence s, integer i=1)
     elsif sequence(op_FE_width_REG_RM[and_bits(s[i],#FE)+1]) then
         -- Операция между регистром и регистром/памятью без флага направления
         sequence mnemonix = op_FE_width_REG_RM[and_bits(s[i],#FE)+1]
-        integer size = and_bits(s[i],1)
+        integer flag_size = and_bits(s[i],1)
         object x = analyse_modrm(s,i+1)
         if atom(x) then
             return x
         end if
         i = x[$]
         x = unify_operands(x)
-        sequence reg = regs[x[1]+1][1+size*2-prefix_size]
+        sequence reg = regs[x[1]+1][1+flag_size*2-prefix_size]
         text = sprintf("%s %s, %s", {mnemonix, reg, seg_prefix & op_to_text(x[2])})
     elsif sequence(op_FC_dir_width_REG_RM[and_bits(s[i],#FC)+1]) then
         -- Операция между регистром и регистром/памятью с флагом направления
         sequence mnemonix = op_FC_dir_width_REG_RM[and_bits(s[i],#FC)+1]
         integer d = and_bits(s[i],2)
-        integer size = and_bits(s[i],1)
+        integer flag_size = and_bits(s[i],1)
         object x = analyse_modrm(s,i+1)
         if atom(x) then
             return x
         end if
         i = x[$]
         x = unify_operands(x)
-        sequence reg = regs[x[1]+1][1+size*2-prefix_size]
+        sequence reg = regs[x[1]+1][1+flag_size*2-prefix_size]
         text = sprintf("%s %s, %s", {mnemonix} & swap({reg, seg_prefix & op_to_text(x[2])}, not d))
     elsif and_bits(s[i],#FE) = MOV_MEM_IMM8 then
         object x = analyse_modrm(s,i+1)
-        integer size = and_bits(s[i],1)
+        integer flag_size = and_bits(s[i],1)
         if atom(x) then
             return x
         end if
@@ -473,7 +474,7 @@ function disasm(integer start_addr, sequence s, integer i=1)
             end if
             atom immediate
             sequence size_spec
-            if size=0 then
+            if flag_size=0 then
                 immediate = s[i]
                 size_spec = "byte"
                 i += 1
@@ -508,11 +509,11 @@ function disasm(integer start_addr, sequence s, integer i=1)
         i += 5
     elsif sequence(op_FE_width_acc_imm[and_bits(s[i],#FE)+1]) then
         sequence mnemonix = op_FE_width_acc_imm[and_bits(s[i],#FE)+1]
-        integer size = and_bits(s[i],1)
+        integer flag_size = and_bits(s[i],1)
         i += 1
         atom immediate
         sequence acc
-        if size=0 then
+        if flag_size=0 then
             immediate = s[i]
             acc = "al"
             i += 1
@@ -527,18 +528,18 @@ function disasm(integer start_addr, sequence s, integer i=1)
         end if
         text = sprintf("%s %s, %s", {mnemonix, acc, asmhex(immediate)})
     elsif and_bits(s[i],#F0) = MOV_REG_IMM then
-        integer size = and_bits(s[i],8)/8
+        integer flag_size = and_bits(s[i],8)/8
         integer reg = and_bits(s[i],7)
         i += 1
         atom immediate
-        if size then
+        if flag_size then
             immediate = bytes_to_int(s[i..i+3])
             i += 4
         else
             immediate = s[i]
             i += 1
         end if
-        text = sprintf("mov %s, %s", {regs[reg+1][1+size*2], asmhex(immediate)})
+        text = sprintf("mov %s, %s", {regs[reg+1][1+flag_size*2], asmhex(immediate)})
     elsif sequence(op_F8_reg[and_bits(s[i],#F8)+1]) then
         sequence mnemonix = op_F8_reg[and_bits(s[i],#F8)+1]
         integer reg = and_bits(s[i],7)
@@ -546,7 +547,7 @@ function disasm(integer start_addr, sequence s, integer i=1)
         i += 1
     elsif find(and_bits(s[i],#FE),{SHIFT_OP_RM_1,SHIFT_OP_RM_CL,SHIFT_OP_RM_IMM8}) then
         integer opcode = and_bits(s[i],#FE)
-        integer size = and_bits(s[i],1)
+        integer flag_size = and_bits(s[i],1)
         object x = analyse_modrm(s,i+1)
         if atom(x) then
             return x
@@ -566,7 +567,7 @@ function disasm(integer start_addr, sequence s, integer i=1)
         end if
         text = sprintf("%s %s, %s",{mnemonix,op_to_text(x[2]),op2})
     elsif and_bits(s[i],#FE)=TEST_or_unary_RM then
-        integer size = and_bits(s[i],1)
+        integer flag_size = and_bits(s[i],1)
         i += 1
         object x = analyse_modrm(s,i)
         if atom(x) then
@@ -579,7 +580,7 @@ function disasm(integer start_addr, sequence s, integer i=1)
             sequence mnemonix = mnemos[x[1]+1]
             if sequence(x[2]) then
                 sequence size_spec
-                if size=0 then
+                if flag_size=0 then
                     size_spec = "byte"
                 elsif prefix_size=1 then
                     size_spec = "word"
@@ -588,13 +589,13 @@ function disasm(integer start_addr, sequence s, integer i=1)
                 end if
                 text = sprintf("%s %s %s",{mnemonix, size_spec, op_to_text(x[2])})
             else
-                sequence reg = regs[x[2]+1][1+size*2-prefix_size]
+                sequence reg = regs[x[2]+1][1+flag_size*2-prefix_size]
                 text = sprintf("%s %s",{mnemonix, reg})
             end if
         elsif x[1]=0 then -- test r/m, imm
             sequence size_spec
             atom immediate
-            if size=0 then
+            if flag_size=0 then
                 size_spec = "byte"
                 immediate = s[i]
                 i += 1
@@ -609,16 +610,16 @@ function disasm(integer start_addr, sequence s, integer i=1)
             end if
             
             if atom(x[2]) then
-                sequence reg = regs[x[2]+1][1+size*2-prefix_size]
+                sequence reg = regs[x[2]+1][1+flag_size*2-prefix_size]
                 text = sprintf("test %s, %s",{reg,asmhex(immediate)})
             else
                 text = sprintf("test %s %s, %s",{size_spec,op_to_text(x[2]),asmhex(immediate)})
             end if
         end if
     elsif and_bits(s[i],#FD) = PUSH_IMM32 then
-        integer size = and_bits(s[i],2)
+        integer flag_size = and_bits(s[i],2)
         atom immediate
-        if size then
+        if flag_size then
             if length(s)<i+1 then
                 return length(s)-(i+4)
             end if
@@ -640,28 +641,38 @@ function disasm(integer start_addr, sequence s, integer i=1)
         i = x[$]
         x = unify_operands(x)
         text = sprintf("pop dword %s", {op_to_text(x[2])})
-    elsif s[i] = #FF then
+    elsif and_bits(s[i],#FE) = #FE then
+        integer flag_size = and_bits(s[i],1)
         i += 1
-        if s[i] = JMP_INDIR[2] then
-            atom immediate = bytes_to_int(s[i+1..i+4])
-            text = sprintf("jmp dword %s[%s]",{seg_prefix,asmhex(immediate)})
-            i += 5
-        elsif and_bits(s[i],#38) = PUSH_INDIR[2] then
-            object x = analyse_modrm(s,i) -- байт mod r/m накладывается на опкод
+        integer op = and_bits(s[i],#38)/8 -- the second field of modrm byte
+        -- trace(1)
+        if op<7 then
+            object x = analyse_modrm(s,i)
             if atom(x) then
                 return x
             end if
             i = x[$]
             x = unify_operands(x)
-            text = sprintf("push dword %s%s", {seg_prefix, op_to_text(x[2])})
-        elsif and_bits(s[i],#38) = CALL_INDIR[2] then
-            object x = analyse_modrm(s,i) -- байт mod r/m накладывается на опкод
-            if atom(x) then
-                return x
+            sequence mnemos = {"inc","dec","call dword","call far","jmp dword","jmp far","push dword"}
+            sequence mnemonix = mnemos[x[1]+1]
+            if op<2 then
+                if sequence(x[2]) then
+                    sequence size_spec
+                    if flag_size=0 then
+                        size_spec = "byte"
+                    elsif prefix_size=1 then
+                        size_spec = "word"
+                    else
+                        size_spec = "dword"
+                    end if
+                    text = sprintf("%s %s %s",{mnemonix,size_spec,op_to_text(x[2])})
+                else
+                    sequence reg = regs[x[2]+1][1+flag_size*2-prefix_size]
+                    text = sprintf("%s %s",{mnemonix,reg})
+                end if
+            elsif flag_size then
+                text = sprintf("%s %s%s",{mnemonix,seg_prefix,op_to_text(x[2])})
             end if
-            i = x[$]
-            x = unify_operands(x)
-            text = sprintf("call dword %s%s", {seg_prefix, op_to_text(x[2])})
         end if
     elsif s[i] = #0F then
         i += 1
@@ -680,15 +691,15 @@ function disasm(integer start_addr, sequence s, integer i=1)
             i += 5
         elsif find(and_bits(s[i],#FE), {MOVZX[2], MOVSX[2]}) then
             integer op = and_bits(s[i],#FE)
-            integer size = and_bits(s[i],1)
+            integer flag_size = and_bits(s[i],1)
             object x = analyse_modrm(s,i+1)
             if atom(x) then
                 return x
             end if
             i = x[$]
             x = unify_operands(x)
-            sequence reg = regs[x[1]+1][1+size*2]
-            sequence size_spec = op_sizes[size+1]
+            sequence reg = regs[x[1]+1][1+flag_size*2]
+            sequence size_spec = op_sizes[flag_size+1]
             sequence mnemonix
             if op=MOVZX[2] then
                 mnemonix = "movzx"
