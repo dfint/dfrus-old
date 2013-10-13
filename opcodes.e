@@ -143,3 +143,6 @@ public constant
     SHIFT_OP_RM_CL   = #D2, -- + width
     SHIFT_OP_RM_IMM8 = #C0, -- + width
     $
+
+public constant
+    TEST_or_unary_RM = #F6 -- + width & MODRM (reg==0 - test; reg==1 - n/a; reg==2 through 7 - unary ops)
