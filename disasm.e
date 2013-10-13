@@ -335,7 +335,7 @@ sequence shifts_rolls = {"rol","ror","rcl","rcr","shl","shr","sal","sar"}
 -- Набросок функции, по введенному машинному коду возвращающей его ассемблерное представление
 public
 function disasm(integer start_addr, sequence s, integer i=1)
-    sequence text, op_prefix={}
+    sequence text, seg_prefix={}
     integer j = i
     integer addr = start_addr+i-1
     integer seg
@@ -344,7 +344,7 @@ function disasm(integer start_addr, sequence s, integer i=1)
     -- Прежде всего, нужно разобрать префиксы. Некоторые префиксы (REP, например) можно отображать как отдельные инструкции
     seg = find(s[i],{SEG_CS,SEG_DS,SEG_ES,SEG_SS,SEG_FS,SEG_GS})
     if seg then
-        op_prefix = seg_tags[seg]
+        seg_prefix = seg_tags[seg]
         -- prefixes = prepend(prefixes, s[i])
         i += 1
     end if
@@ -377,12 +377,12 @@ function disasm(integer start_addr, sequence s, integer i=1)
         integer immediate = addr+2+check_sign_bit(s[i+1])
         text = sprintf("jmp short %s",{asmhex(immediate)})
         i += 2
-    elsif and_bits(s[i],#F8) = JCC_SHORT then
+    elsif and_bits(s[i],#F0) = JCC_SHORT then
         if length(s)<i+1 then
             return length(s)-(i+1)
         end if
+        integer condition = and_bits(s[i],#0F)
         integer immediate = addr+2+check_sign_bit(s[i+1])
-        integer condition = and_bits(s[i],7)
         text = sprintf("j%s short %s",{conds[condition+1], asmhex(immediate)})
         i += 2
     elsif s[i] = LEA then
@@ -442,7 +442,7 @@ function disasm(integer start_addr, sequence s, integer i=1)
         i = x[$]
         x = unify_operands(x)
         sequence reg = regs[x[1]+1][1+size*2-prefix_size]
-        text = sprintf("%s %s, %s", {mnemonix, reg, op_prefix & op_to_text(x[2])})
+        text = sprintf("%s %s, %s", {mnemonix, reg, seg_prefix & op_to_text(x[2])})
     elsif sequence(op_FC_dir_width_REG_RM[and_bits(s[i],#FC)+1]) then
         -- Операция между регистром и регистром/памятью с флагом направления
         sequence mnemonix = op_FC_dir_width_REG_RM[and_bits(s[i],#FC)+1]
@@ -455,7 +455,7 @@ function disasm(integer start_addr, sequence s, integer i=1)
         i = x[$]
         x = unify_operands(x)
         sequence reg = regs[x[1]+1][1+size*2-prefix_size]
-        text = sprintf("%s %s, %s", {mnemonix} & swap({reg, op_prefix & op_to_text(x[2])}, not d))
+        text = sprintf("%s %s, %s", {mnemonix} & swap({reg, seg_prefix & op_to_text(x[2])}, not d))
     elsif and_bits(s[i],#FE) = MOV_MEM_IMM8 then
         object x = analyse_modrm(s,i+1)
         integer size = and_bits(s[i],1)
@@ -493,7 +493,7 @@ function disasm(integer start_addr, sequence s, integer i=1)
         end if
         i = x[$]
         x = unify_operands(x)
-        text = sprintf("mov %s, %s", swap({seg_regs[x[1]+1], op_prefix & op_to_text(x[2])}, not d))
+        text = sprintf("mov %s, %s", swap({seg_regs[x[1]+1], seg_prefix & op_to_text(x[2])}, not d))
     elsif and_bits(s[i],#FC) = MOV_ACC_MEM then
         integer d = and_bits(s[i],2)
         if length(s)<i+4 then
@@ -501,7 +501,7 @@ function disasm(integer start_addr, sequence s, integer i=1)
         end if
         atom immediate = bytes_to_int(s[i+1..i+4])
         -- @TODO: take in account operand size
-        text = sprintf("mov %s, %s", swap({regs[EAX+1][3],op_prefix&'['&asmhex(immediate)&']'},d))
+        text = sprintf("mov %s, %s", swap({regs[EAX+1][3],seg_prefix&'['&asmhex(immediate)&']'},d))
         i += 5
     elsif sequence(op_FE_width_acc_imm[and_bits(s[i],#FE)+1]) then
         sequence mnemonix = op_FE_width_acc_imm[and_bits(s[i],#FE)+1]
@@ -641,7 +641,7 @@ function disasm(integer start_addr, sequence s, integer i=1)
         i += 1
         if s[i] = JMP_INDIR[2] then
             atom immediate = bytes_to_int(s[i+1..i+4])
-            text = sprintf("jmp dword %s[%s]",{op_prefix,asmhex(immediate)})
+            text = sprintf("jmp dword %s[%s]",{seg_prefix,asmhex(immediate)})
             i += 5
         elsif and_bits(s[i],#38) = PUSH_INDIR[2] then
             object x = analyse_modrm(s,i) -- байт mod r/m накладывается на опкод
@@ -650,7 +650,7 @@ function disasm(integer start_addr, sequence s, integer i=1)
             end if
             i = x[$]
             x = unify_operands(x)
-            text = sprintf("push dword %s%s", {op_prefix, op_to_text(x[2])})
+            text = sprintf("push dword %s%s", {seg_prefix, op_to_text(x[2])})
         elsif and_bits(s[i],#38) = CALL_INDIR[2] then
             object x = analyse_modrm(s,i) -- байт mod r/m накладывается на опкод
             if atom(x) then
@@ -658,15 +658,23 @@ function disasm(integer start_addr, sequence s, integer i=1)
             end if
             i = x[$]
             x = unify_operands(x)
-            text = sprintf("call dword %s%s", {op_prefix, op_to_text(x[2])})
+            text = sprintf("call dword %s%s", {seg_prefix, op_to_text(x[2])})
         end if
     elsif s[i] = #0F then
         i += 1
-        if and_bits(s[i],#F8)=SETCC[2] and and_bits(s[i+1],#C0)=#C0 then
-            integer condition = and_bits(s[i],7)
+        if and_bits(s[i],#F0)=SETCC[2] and and_bits(s[i+1],#C0)=#C0 then
+            integer condition = and_bits(s[i],#0F)
             sequence reg = regs[and_bits(s[i+1],7)][1] -- 8bit regs
             text = sprintf("set%s %s",{conds[condition+1],reg})
             i += 2
+        elsif and_bits(s[i],#F0)=JCC_NEAR[2] then
+            if length(s)<i+4 then
+                return length(s)-(i+4)
+            end if
+            integer condition = and_bits(s[i],#0F)
+            atom immediate = addr+5+check_sign_bit(bytes_to_int(s[i+1..i+4]),32)
+            text = sprintf("j%s near %s",{conds[condition+1], asmhex(immediate)})
+            i += 5
         elsif find(and_bits(s[i],#FE), {MOVZX[2], MOVSX[2]}) then
             integer op = and_bits(s[i],#FE)
             integer size = and_bits(s[i],1)
