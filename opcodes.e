@@ -1,5 +1,32 @@
 -- Коды машинных операций x86
 
+-- Коды условий
+public enum
+    COND_O   = #0, -- Overflow
+    COND_NO, -- Not Overflow
+    COND_B,  COND_NAE = COND_B,  COND_C  = COND_B, -- Below, Not Above or Equal, Carry
+    COND_NB, COND_AE  = COND_NB, COND_NC = COND_NB, -- Not Below, Above or Equal, Not Carry
+    COND_E,  COND_Z   = COND_E, -- Equal, Zero
+    COND_NE, COND_NZ  = COND_NE, -- Not Equal, Not Zero
+    COND_BE, COND_NA  = COND_BE, -- Below or equal, Not Above
+    COND_A,  COND_NBE = COND_A, -- Above, Not Below or Equal
+    COND_S,  -- Sign
+    COND_NS, -- Not Sign
+    COND_P,  COND_PE  = COND_P, -- Parity, Parity Even
+    COND_NP, COND_PO  = COND_NP, -- Not Parity, Parity Odd
+    COND_L,  COND_NGE = COND_L, -- Less, Not Greater or Equal
+    COND_NL, COND_GE  = COND_NL, -- Not Less, Greater or Equal
+    COND_LE, COND_NG  = COND_LE, -- Less or Equal, Not Greater
+    COND_G,  COND_NLE = COND_G, -- Not Less or Equal, Greater
+    $
+
+-- Коды регистров:
+public enum
+    AL = 0, CL, DL, BL, AH, CH, DH, BH,
+    AX = 0, CX, DX, BX, SP, BP, SI, DI,
+    EAX = 0, ECX, EDX, EBX, ESP, EBP, ESI, EDI,
+    ES = 0, CS, SS, DS, FS, GS
+
 -- Префиксы команд:
 public constant
     REP = #F3, REPE = REP, REPZ  = REPE,
@@ -12,10 +39,10 @@ public constant
 
 -- Префиксы замены сегментов:
 public constant
-    SEG_CS = #2E,
-    SEG_DS = #3E,
     SEG_ES = #26,
+    SEG_CS = #2E,
     SEG_SS = #36,
+    SEG_DS = #3E,
     SEG_FS = #64,
     SEG_GS = #65
 
@@ -48,37 +75,6 @@ public constant
     RET_FAR_D   = #CA,
     LEAVE       = #C9,
     INT3        = #CC
-
--- Коды условий
-public constant
-    COND_O   = #0, -- Overflow
-    COND_NO  = COND_O+1, -- Not Overflow
-    COND_B   = #2, COND_NAE = COND_B, COND_C = COND_B, -- Below, Not Above or Equal, Carry
-    COND_NB  = COND_B+1, COND_AE = COND_NB, COND_NC = COND_NB, -- Not Below, Above or Equal, Not Carry
-    COND_E   = #4, COND_Z = COND_E, -- Equal, Zero
-    COND_NE  = COND_E+1, COND_NZ = COND_NE, -- Not Equal, Not Zero
-    COND_BE  = #6, COND_NA = COND_BE, -- Below or equal, Not Above
-    COND_NBE = COND_BE+1, COND_A = COND_NBE, -- Not Below or Equal, Above
-    COND_S   = #8, -- Sign
-    COND_NS  = COND_S+1, -- Not Sign
-    COND_P   = #A, COND_PE = COND_P, -- Parity, Parity Even
-    COND_NP  = COND_P+1, COND_PO = COND_NP, -- Not Parity, Parity Odd
-    COND_L   = #C, COND_NGE = COND_L, -- Less, Not Greater or Equal
-    COND_NL  = COND_L+1, COND_GE = COND_NL, -- Not Less, Greater or Equal
-    COND_LE  = #E, COND_NG = COND_LE, -- Less or Equal, Not Greater
-    COND_NLE = COND_LE+1, COND_G = COND_NLE, -- Not Less or Equal, Greater
-    $
-
--- Коды регистров:
-public constant
-    AL = 0, AX = 0, EAX = 0, ES = 0,
-    CL = 1, CX = 1, ECX = 1, CS = 1,
-    DL = 2, DX = 2, EDX = 2, SS = 2,
-    BL = 3, BX = 3, EBX = 3, DS = 3,
-    AH = 4, SP = 4, ESP = 4, FS = 4,
-    CH = 5, BP = 5, EBP = 5, GS = 5,
-    DH = 6, SI = 6, ESI = 6,
-    BH = 7, DI = 7, EDI = 7
 
 -- push
 public constant
