@@ -33,7 +33,7 @@ public
 function load_trans_file_to_map(sequence fname)
     object line
     sequence x
-    map trans = new()
+    map trans = map:new()
     atom fn = open(fname, "r")
     if fn < 0 then
         return -1
@@ -50,7 +50,7 @@ function load_trans_file_to_map(sequence fname)
             if has(trans,x[2]) and debug then
                 printf(1,"Warning: there already is '%s' key in the map.\n",{x[2]})
             end if
-            put(trans,x[2],x[3])
+            map:put(trans,x[2],x[3])
         end if
     end while
     return trans
@@ -60,7 +60,7 @@ constant code=1, rdata = 2, data = 3
 public
 function get_cross_references_to_map(atom fn, sequence relocs, sequence sections, atom image_base)
     atom obj
-    map xrefs = new()
+    map xrefs = map:new()
     for i = 1 to length(relocs) do
         -- Получаем смещение объекта, на который указывает перемещаемый элемент
         -- превращаем адрес в смещение и читаем что по этому смещению находится:
@@ -75,7 +75,7 @@ function get_cross_references_to_map(atom fn, sequence relocs, sequence sections
         -- Проверяем, находится ли адрес в секциях .rdata или .data:
         if obj >= sections[rdata][SECTION_POFFSET] and obj < sections[data][SECTION_POFFSET]+sections[data][SECTION_PSIZE] then
             -- Добавляем смещение объекта в хэш-таблицу
-            put(xrefs,obj,relocs[i],APPEND)
+            map:put(xrefs,obj,relocs[i],APPEND)
         end if
     end for
     return xrefs
