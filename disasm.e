@@ -1,126 +1,19 @@
--- Коды машинных операций x86
+public include opcodes.e
 
--- Префиксы команд:
-public constant
-    REP = #F3, REPE = REP, REPZ  = REPE,
-    REPNE = #F2, REPNZ = REPNE,
-    LOCK  = #F0 -- Префикс блокировки шины
-
-public constant
-    PREFIX_ADDR = #67, -- Префикс замены размера адреса
-    PREFIX_OPERAND_SIZE = #66 -- Префикс замены размера операнда
-
--- Префиксы замены сегментов:
-public constant
-    SEG_CS = #2E,
-    SEG_DS = #3E,
-    SEG_ES = #26,
-    SEG_SS = #36,
-    SEG_FS = #64,
-    SEG_GS = #65
-
-public constant
-    JMP_NEAR  = #E9,
-    JMP_SHORT = JMP_NEAR+2,
-    JMP_INDIR = {#0F,#25},
-    JCC_SHORT = #70, -- + cond
-    JCC_NEAR  = {#0F,#80} -- + {0,cond}
-
-public constant
-    CMP_RM_IMM = #80
-
-public constant
-    CALL_NEAR   = #E8,
-    CALL_INDIR  = {#FF, #10}
-
-public constant
-    RET_NEAR    = #C3,
-    LEAVE       = #C9,
-    INT3        = #CC
-
--- Коды условий
-public constant
-    COND_O   = #0, -- Overflow
-    COND_NO  = COND_O+1, -- Not Overflow
-    COND_B   = #2, COND_NAE = COND_B, COND_C = COND_B, -- Below, Not Above or Equal, Carry
-    COND_NB  = COND_B+1, COND_AE = COND_NB, COND_NC = COND_NB, -- Not Below, Above or Equal, Not Carry
-    COND_E   = #4, COND_Z = COND_E, -- Equal, Zero
-    COND_NE  = COND_E+1, COND_NZ = COND_NE, -- Not Equal, Not Zero
-    COND_BE  = #6, COND_NA = COND_BE, -- Below or equal, Not Above
-    COND_NBE = COND_BE+1, COND_A = COND_NBE, -- Not Below or Equal, Above
-    COND_S   = #8, -- Sign
-    COND_NS  = COND_S+1, -- Not Sign
-    COND_P   = #A, COND_PE = COND_P, -- Parity, Parity Even
-    COND_NP  = COND_P+1, COND_PO = COND_NP, -- Not Parity, Parity Odd
-    COND_L   = #C, COND_NGE = COND_L, -- Less, Not Greater or Equal
-    COND_NL  = COND_L+1, COND_GE = COND_NL, -- Not Less, Greater or Equal
-    COND_LE  = #E, COND_NG = COND_LE, -- Less or Equal, Not Greater
-    COND_NLE = COND_LE+1, COND_G = COND_NLE, -- Not Less or Equal, Greater
-    $
-
-constant conds = {"o","no","b","nb","z","nz","na","a","s","ns","p","np","l","nl","ng","g"}
-
--- Коды регистров:
-public constant
-    AL = 0, AX = 0, EAX = 0, ES = 0,
-    CL = 1, CX = 1, ECX = 1, CS = 1,
-    DL = 2, DX = 2, EDX = 2, SS = 2,
-    BL = 3, BX = 3, EBX = 3, DS = 3,
-    AH = 4, SP = 4, ESP = 4, FS = 4,
-    CH = 5, BP = 5, EBP = 5, GS = 5,
-    DH = 6, SI = 6, ESI = 6,
-    BH = 7, DI = 7, EDI = 7
+constant seg_regs = {"es","cs","ss","ds","fs","gs"}
 
 constant regs = {
-    {"al","ax","eax","es"},
-    {"cl","cx","ecx","cs"},
-    {"dl","dx","edx","ss"},
-    {"bl","bx","ebx","ds"},
-    {"ah","sp","esp","fs"},
-    {"ch","bp","ebp","gs"},
+    {"al","ax","eax"},
+    {"cl","cx","ecx"},
+    {"dl","dx","edx"},
+    {"bl","bx","ebx"},
+    {"ah","sp","esp"},
+    {"ch","bp","ebp"},
     {"dh","si","esi"},
     {"bh","di","edi"}
 }
 
--- push
-public constant
-    PUSH_REG    = #50, -- + REG
-    PUSH_IMM32  = #68,
-    PUSH_IMM8   = PUSH_IMM32 + 2,
-    PUSH_INDIR  = {#FF,#30}, -- + размер смещение * 40h + базовый регистр [& SIB]
-    PUSHFD      = #9C,
-    $
-
-public constant
-    POP_REG     = #58, -- + REG
-    POP_RM      = #8F
-
-public constant PUSHAD = #60, POPAD = #61
-
-public constant
-    MOV_REG_IMM = #B0, -- + 8*width + REG
-    MOV_ACC_MEM = #A0, -- + 2*dir + width
-    MOV_RM_REG  = #88, -- + 2*dir + width
-    MOV_REG_RM  = MOV_RM_REG+2, -- + width
-    MOV_MEM_IMM8 = #C6,
-    MOV_MEM_IMM = MOV_MEM_IMM8+1,
-    MOV_RM_SEG  = #8C, -- + 2*dir
-    $
-
-public constant
-    XOR_RM_REG  = #30, -- + 2*dir + width
-    SUB_REG_RM  = #2B,
-    SUB_RM_IMM  = #81,
-    ADD_RM_IMM  = #83, -- #80 + 3*width
-    $
-
-public constant LEA = #8D
-
-public constant NOP = #90
-
-public constant MOVZX = {#0F,#B6}, MOVSX = {#0F,#BE}
-
-public constant MOVSB = #A4, MOVSD = #A5, MOVSW = PREFIX_OPERAND_SIZE & MOVSD
+constant conds = {"o","no","b","nb","z","nz","na","a","s","ns","p","np","l","nl","ng","g"}
 
 -- Разбить байт на триады
 public
@@ -341,7 +234,6 @@ function unify_operands(sequence x)
 end function
 
 function op_to_text(object op)
-    -- ? op
     sequence text
     if atom(op) then
         text = regs[op+1][3]
@@ -389,55 +281,96 @@ end function
 constant seg_tags = {"cs:","ds:","es:","ss:","fs:","gs:"}
 constant op_sizes = {"byte","word","dword"}
 
+-- Опкоды однобайтовых операций без аргумнтов:
+sequence op_1byte_nomask_noargs = repeat(-1,256)
+op_1byte_nomask_noargs[NOP+1]      = "nop"
+op_1byte_nomask_noargs[RET_NEAR+1] = "retn"
+op_1byte_nomask_noargs[PUSHFD+1]   = "pushfd"
+op_1byte_nomask_noargs[PUSHAD+1]   = "pushad"
+op_1byte_nomask_noargs[POPFD+1]    = "popfd"
+op_1byte_nomask_noargs[POPAD+1]    = "popad"
+op_1byte_nomask_noargs[LEAVE+1]    = "leave"
+op_1byte_nomask_noargs[INT3+1]     = "int3"
+
+-- Опкоды операций без маски
+sequence op_nomask = repeat(-1,256)
+op_nomask[CALL_NEAR+1] = "call near"
+op_nomask[JMP_NEAR+1]  = "jmp near"
+op_nomask[JMP_SHORT+1] = "jmp short"
+
+-- Опкоды с неизменяемой частью по маске #FC, флагами направления и размера операнда
+-- по идее было бы достаточно 64 элемента, т.к. проверяются только старшие 6 бит
+sequence op_FC_dir_width_REG_RM = repeat(-1,256)
+op_FC_dir_width_REG_RM[MOV_RM_REG+1] = "mov"
+op_FC_dir_width_REG_RM[ADD_RM_REG+1] = "add"
+op_FC_dir_width_REG_RM[SUB_RM_REG+1] = "sub"
+op_FC_dir_width_REG_RM[OR_RM_REG+1]  = "or"
+op_FC_dir_width_REG_RM[AND_RM_REG+1] = "and"
+op_FC_dir_width_REG_RM[XOR_RM_REG+1] = "xor"
+op_FC_dir_width_REG_RM[CMP_RM_REG+1] = "cmp"
+op_FC_dir_width_REG_RM[#10+1] = "adc"
+op_FC_dir_width_REG_RM[#18+1] = "sbb"
+
+sequence op_FE_width_REG_RM = repeat(-1,256)
+op_FE_width_REG_RM[TEST_RM_REG+1] = "test"
+op_FE_width_REG_RM[XCHG_RM_REG+1] = "xchg"
+
+sequence op_F8_reg = repeat(-1,256)
+op_F8_reg[PUSH_REG+1] = "push"
+op_F8_reg[POP_REG+1]  = "pop"
+op_F8_reg[INC_REG+1]  = "inc"
+op_F8_reg[DEC_REG+1]  = "dec"
+
+sequence op_FE_width_acc_imm = repeat(-1,256)
+op_FE_width_acc_imm[ADD_ACC_IMM+1] = "add"
+op_FE_width_acc_imm[SUB_ACC_IMM+1] = "sub"
+op_FE_width_acc_imm[OR_ACC_IMM+1]  = "or"
+op_FE_width_acc_imm[AND_ACC_IMM+1] = "and"
+op_FE_width_acc_imm[XOR_ACC_IMM+1] = "xor"
+op_FE_width_acc_imm[CMP_ACC_IMM+1] = "cmp"
+op_FE_width_acc_imm[TEST_ACC_IMM+1] = "test"
+op_FE_width_acc_imm[#14+1] = "adc"
+op_FE_width_acc_imm[#1C+1] = "sbb"
+
+sequence shifts_rolls = {"rol","ror","rcl","rcr","shl","shr","sal","sar"}
+
 -- Набросок функции, по введенному машинному коду возвращающей его ассемблерное представление
 public
 function disasm(integer start_addr, sequence s, integer i=1)
-    sequence text, op_prefix={}
+    sequence text, seg_prefix={}
     integer j = i
     integer addr = start_addr+i-1
     integer seg
-    integer op_size = 0
+    integer size_prefix = 0
     -- sequence prefixes = {}
     -- Прежде всего, нужно разобрать префиксы. Некоторые префиксы (REP, например) можно отображать как отдельные инструкции
     seg = find(s[i],{SEG_CS,SEG_DS,SEG_ES,SEG_SS,SEG_FS,SEG_GS})
     if seg then
-        op_prefix = seg_tags[seg]
+        seg_prefix = seg_tags[seg]
         -- prefixes = prepend(prefixes, s[i])
         i += 1
     end if
+    
     if s[i]=PREFIX_OPERAND_SIZE then
         -- prefixes = prepend(prefixes, s[i])
-        op_size = 1
+        size_prefix = 1
         i += 1
     end if
-    if s[i] = NOP then
-        text = "nop"
+    
+    if sequence(op_1byte_nomask_noargs[s[i]+1]) then
+        text = op_1byte_nomask_noargs[s[i]+1]
         i += 1
-    elsif s[i] = RET_NEAR then
-        text = "retn"
-        i += 1
-    elsif s[i] = PUSHFD then
-        text = "pushfd"
-        i += 1
-    elsif s[i] = LEAVE then
-        text = "leave"
-        i += 1
-    elsif s[i] = INT3 then
-        text = "int3"
-        i += 1
-    elsif s[i] = CALL_NEAR then
+    elsif s[i] = RET_NEAR_N then
+        integer immediate = bytes_to_int(s[i+1..i+2])
+        text = sprintf("retn %s",{asmhex(immediate)})
+        i += 3
+    elsif s[i] = CALL_NEAR or s[i] = JMP_NEAR then
+        sequence mnemonix = op_nomask[s[i]+1]
         if length(s)<i+4 then
             return length(s)-(i+4)
         end if
         atom immediate = addr+5+check_sign_bit(bytes_to_int(s[i+1..i+4]),32)
-        text = sprintf("call near %s",{asmhex(immediate)})
-        i += 5
-    elsif s[i] = JMP_NEAR then
-        if length(s)<i+4 then
-            return length(s)-(i+4)
-        end if
-        atom immediate = addr+5+check_sign_bit(bytes_to_int(s[i+1..i+4]),32)
-        text = sprintf("jmp near %s",{asmhex(immediate)})
+        text = sprintf("%s %s",{mnemonix, asmhex(immediate)})
         i += 5
     elsif s[i] = JMP_SHORT then
         if length(s)<i+1 then
@@ -446,12 +379,13 @@ function disasm(integer start_addr, sequence s, integer i=1)
         integer immediate = addr+2+check_sign_bit(s[i+1])
         text = sprintf("jmp short %s",{asmhex(immediate)})
         i += 2
-    elsif and_bits(s[i],#F8) = JCC_SHORT then
+    elsif and_bits(s[i],#F0) = JCC_SHORT then
         if length(s)<i+1 then
             return length(s)-(i+1)
         end if
+        integer condition = and_bits(s[i],#0F)
         integer immediate = addr+2+check_sign_bit(s[i+1])
-        text = sprintf("j%s short %s",{conds[and_bits(s[i],7)+1], asmhex(immediate)})
+        text = sprintf("j%s short %s",{conds[condition+1], asmhex(immediate)})
         i += 2
     elsif s[i] = LEA then
         object x = analyse_modrm(s,i+1)
@@ -460,44 +394,75 @@ function disasm(integer start_addr, sequence s, integer i=1)
         end if
         i = x[$]
         x = unify_operands(x)
-        text = sprintf("lea %s, %s", {op_to_text(x[1]), op_to_text(x[2])})
-    elsif s[i] = SUB_REG_RM then
-        object x = analyse_modrm(s,i+1)
-        if atom(x) then
-            return x
-        end if
-        i = x[$]
-        x = unify_operands(x)
-        text = sprintf("sub %s, %s", {op_to_text(x[1]), op_to_text(x[2])})
-    elsif s[i] = SUB_RM_IMM then
-        object x = analyse_modrm(s,i+1)
-        if atom(x) then
-            return x
-        end if
-        if x[1][2] = 5 then
+        sequence reg = regs[x[1]+1][3]
+        text = sprintf("lea %s, %s", {reg, op_to_text(x[2])})
+    elsif and_bits(s[i],#FC) = OP_RM_IMM then
+        integer flags = and_bits(s[i],3)
+        sequence mnemos = {"add","or","adc","sbb","and","sub","xor","cmp"}
+        if flags != 2 then
+            object x = analyse_modrm(s,i+1)
+            sequence mnemonix = mnemos[x[1][2]+1]
+            if atom(x) then
+                return x
+            end if
+            
             i = x[$]
             x = unify_operands(x)
-            if length(s)<i+3 then
-                return length(s)-(i+3)
+            sequence size_spec = ""
+            if not atom(x[2]) then
+                -- @TODO: перенести эту функциональность в op_to_text
+                if flags = 0 then
+                    size_spec = "byte "
+                elsif size_prefix = 1 then
+                    size_spec = "word "
+                else
+                    size_spec = "dword "
+                end if
             end if
-            atom immediate = bytes_to_int(s[i..i+3])
-            text = sprintf("sub %s, %s", {op_to_text(x[2]), asmhex(immediate)})
-            i += 4
+            atom immediate
+            if flags = 1 then
+                if length(s)<i+3 then
+                    return s-(i+3)
+                end if
+                immediate = bytes_to_int(s[i..i+3])
+                i += 4
+            else -- flags = 0 or flags = 3
+                if length(s)<i then
+                    return length(s)-i
+                end if
+                immediate = s[i]
+                i += 1
+            end if
+            text = sprintf("%s %s%s, %s", {mnemonix, size_spec, op_to_text(x[2]), asmhex(immediate)})
         end if
-    elsif and_bits(s[i],#FC) = MOV_RM_REG then
-        integer d = and_bits(s[i],2)
-        integer size = and_bits(s[i],1)
+    elsif sequence(op_FE_width_REG_RM[and_bits(s[i],#FE)+1]) then
+        -- Операция между регистром и регистром/памятью без флага направления
+        sequence mnemonix = op_FE_width_REG_RM[and_bits(s[i],#FE)+1]
+        integer flag_size = and_bits(s[i],1)
         object x = analyse_modrm(s,i+1)
         if atom(x) then
             return x
         end if
         i = x[$]
         x = unify_operands(x)
-        sequence reg
-        text = sprintf("mov %s, %s", swap({regs[x[1]+1][1+size*2-op_size], op_prefix & op_to_text(x[2])},not d))
-    elsif and_bits(s[i],#FE) = MOV_MEM_IMM8 then
+        sequence reg = regs[x[1]+1][1+flag_size*2-size_prefix]
+        text = sprintf("%s %s, %s", {mnemonix, reg, seg_prefix & op_to_text(x[2])})
+    elsif sequence(op_FC_dir_width_REG_RM[and_bits(s[i],#FC)+1]) then
+        -- Операция между регистром и регистром/памятью с флагом направления
+        sequence mnemonix = op_FC_dir_width_REG_RM[and_bits(s[i],#FC)+1]
+        integer d = and_bits(s[i],2)
+        integer flag_size = and_bits(s[i],1)
         object x = analyse_modrm(s,i+1)
-        integer size = and_bits(s[i],1)
+        if atom(x) then
+            return x
+        end if
+        i = x[$]
+        x = unify_operands(x)
+        sequence reg = regs[x[1]+1][1+flag_size*2-size_prefix]
+        text = sprintf("%s %s, %s", {mnemonix} & swap({reg, seg_prefix & op_to_text(x[2])}, not d))
+    elsif and_bits(s[i],#FE) = MOV_RM_IMM then
+        object x = analyse_modrm(s,i+1)
+        integer flag_size = and_bits(s[i],1)
         if atom(x) then
             return x
         end if
@@ -508,20 +473,21 @@ function disasm(integer start_addr, sequence s, integer i=1)
                 return length(s)-(i+3)
             end if
             atom immediate
-            if size=0 then
+            sequence size_spec
+            if flag_size=0 then
                 immediate = s[i]
-                text = sprintf("mov byte %s, %s", {op_to_text(x[2]), asmhex(immediate)})
+                size_spec = "byte"
                 i += 1
-            elsif op_size = 1 then
+            elsif size_prefix = 1 then
                 immediate = bytes_to_int(s[i..i+1])
-                text = sprintf("mov word %s, %s", {op_to_text(x[2]), asmhex(immediate)})
+                size_spec = "word"
                 i += 2
             else
                 immediate = bytes_to_int(s[i..i+3])
-                text = sprintf("mov dword %s, %s", {op_to_text(x[2]), asmhex(immediate)})
+                size_spec = "dword"
                 i += 4
             end if
-            
+            text = sprintf("mov %s %s, %s", {size_spec, op_to_text(x[2]), asmhex(immediate)})
         end if
     elsif and_bits(s[i],#FD) = MOV_RM_SEG then
         integer d = and_bits(s[i],2)
@@ -531,31 +497,133 @@ function disasm(integer start_addr, sequence s, integer i=1)
         end if
         i = x[$]
         x = unify_operands(x)
-        text = sprintf("mov %s, %s", swap({regs[x[1]+1][4], op_prefix & op_to_text(x[2])}, not d))
+        text = sprintf("mov %s, %s", swap({seg_regs[x[1]+1], seg_prefix & op_to_text(x[2])}, not d))
     elsif and_bits(s[i],#FC) = MOV_ACC_MEM then
         integer d = and_bits(s[i],2)
         if length(s)<i+4 then
             return length(s)-(i+4)
         end if
         atom immediate = bytes_to_int(s[i+1..i+4])
-        text = sprintf("mov %s, %s", swap({regs[EAX+1][3],op_prefix&'['&asmhex(immediate)&']'},d))
+        -- @TODO: take in account operand size
+        text = sprintf("mov %s, %s", swap({regs[EAX+1][3],seg_prefix&'['&asmhex(immediate)&']'},d))
         i += 5
-    elsif and_bits(s[i],#FC) = XOR_RM_REG then
+    elsif sequence(op_FE_width_acc_imm[and_bits(s[i],#FE)+1]) then
+        sequence mnemonix = op_FE_width_acc_imm[and_bits(s[i],#FE)+1]
+        integer flag_size = and_bits(s[i],1)
+        i += 1
+        atom immediate
+        sequence acc
+        if flag_size=0 then
+            immediate = s[i]
+            acc = "al"
+            i += 1
+        elsif size_prefix=1 then
+            immediate = bytes_to_int(s[i..i+1])
+            acc = "ax"
+            i += 2
+        else
+            immediate = bytes_to_int(s[i..i+3])
+            acc = "eax"
+            i += 4
+        end if
+        text = sprintf("%s %s, %s", {mnemonix, acc, asmhex(immediate)})
+    elsif and_bits(s[i],#F0) = MOV_REG_IMM then
+        integer flag_size = and_bits(s[i],8)/8
+        integer reg = and_bits(s[i],7)
+        i += 1
+        atom immediate
+        if flag_size then
+            immediate = bytes_to_int(s[i..i+3])
+            i += 4
+        else
+            immediate = s[i]
+            i += 1
+        end if
+        text = sprintf("mov %s, %s", {regs[reg+1][1+flag_size*2], asmhex(immediate)})
+    elsif sequence(op_F8_reg[and_bits(s[i],#F8)+1]) then
+        sequence mnemonix = op_F8_reg[and_bits(s[i],#F8)+1]
+        integer reg = and_bits(s[i],7)
+        text = sprintf("%s %s",{mnemonix, regs[reg+1][3-size_prefix]})
+        i += 1
+    elsif and_bits(s[i],#F8)=XCHG_ACC_REG and s[i]!=NOP then -- actually nop is already handled
+        integer reg = and_bits(s[i],7)
+        text = sprintf("xchg %s, %s",{regs[EAX+1][3-size_prefix], regs[reg+1][3-size_prefix]})
+        i += 1
+    elsif find(and_bits(s[i],#FE),{SHIFT_OP_RM_1,SHIFT_OP_RM_CL,SHIFT_OP_RM_IMM8}) then
+        integer opcode = and_bits(s[i],#FE)
+        integer flag_size = and_bits(s[i],1)
         object x = analyse_modrm(s,i+1)
         if atom(x) then
             return x
         end if
         i = x[$]
         x = unify_operands(x)
-        text = sprintf("xor %s, %s", {op_to_text(x[1]), op_to_text(x[2])})
-    elsif and_bits(s[i],#F8) = PUSH_REG then
-        integer reg = and_bits(s[i],7)
-        text = sprintf("push %s",{regs[reg+1][3]})
+        sequence mnemonix = shifts_rolls[x[1]+1]
+        sequence op2
+        if opcode = SHIFT_OP_RM_1 then
+            op2 = "1"
+        elsif opcode = SHIFT_OP_RM_CL then
+            op2 = "cl"
+        else
+            integer immediate = s[i]
+            op2 = asmhex(immediate)
+            i += 1
+        end if
+        text = sprintf("%s %s, %s",{mnemonix,op_to_text(x[2]),op2})
+    elsif and_bits(s[i],#FE)=TEST_or_unary_RM then
+        integer flag_size = and_bits(s[i],1)
         i += 1
+        object x = analyse_modrm(s,i)
+        if atom(x) then
+            return x
+        end if
+        i = x[$]
+        x = unify_operands(x)
+        if x[1]>=2 then -- unary operations: not, neg, mul, imul etc.
+            sequence mnemos = {0,0,"not","neg","mul","imul","div","idiv"}
+            sequence mnemonix = mnemos[x[1]+1]
+            if sequence(x[2]) then
+                sequence size_spec
+                if flag_size=0 then
+                    size_spec = "byte"
+                elsif size_prefix=1 then
+                    size_spec = "word"
+                else
+                    size_spec = "dword"
+                end if
+                text = sprintf("%s %s %s",{mnemonix, size_spec, op_to_text(x[2])})
+            else
+                sequence reg = regs[x[2]+1][1+flag_size*2-size_prefix]
+                text = sprintf("%s %s",{mnemonix, reg})
+            end if
+        elsif x[1]=0 then -- test r/m, imm
+            sequence size_spec
+            atom immediate
+            if flag_size=0 then
+                size_spec = "byte"
+                immediate = s[i]
+                i += 1
+            elsif size_prefix=1 then
+                size_spec = "word"
+                immediate = bytes_to_int(s[i..i+1])
+                i += 2
+            else
+                size_spec = "dword"
+                immediate = bytes_to_int(s[i..i+3])
+                i += 4
+            end if
+            
+            if atom(x[2]) then
+                sequence reg = regs[x[2]+1][1+flag_size*2-size_prefix]
+                text = sprintf("test %s, %s",{reg,asmhex(immediate)})
+            else
+                text = sprintf("test %s %s, %s",{size_spec,op_to_text(x[2]),asmhex(immediate)})
+            end if
+        end if
     elsif and_bits(s[i],#FD) = PUSH_IMM32 then
-        integer size = and_bits(s[i],2)
+        integer flag_size = and_bits(s[i],2)
         atom immediate
-        if size then
+        if flag_size then
             if length(s)<i+1 then
                 return length(s)-(i+4)
             end if
@@ -569,10 +637,6 @@ function disasm(integer start_addr, sequence s, integer i=1)
             i += 5
         end if
         text = sprintf("push %s",{asmhex(immediate)})
-    elsif and_bits(s[i],#F8) = POP_REG then
-        integer reg = and_bits(s[i],7)
-        text = sprintf("pop %s",{regs[reg+1][3]})
-        i += 1
     elsif s[i] = POP_RM then
         object x = analyse_modrm(s,i+1)
         if atom(x) then
@@ -581,63 +645,72 @@ function disasm(integer start_addr, sequence s, integer i=1)
         i = x[$]
         x = unify_operands(x)
         text = sprintf("pop dword %s", {op_to_text(x[2])})
-    elsif and_bits(s[i],#FC) = CMP_RM_IMM then
-        integer flags = and_bits(s[i],3)
-        
-        if flags != 2 then
+    elsif and_bits(s[i],#FE) = #FE then
+        integer flag_size = and_bits(s[i],1)
+        i += 1
+        integer op = and_bits(s[i],#38)/8 -- the second field of modrm byte
+        -- trace(1)
+        if op<7 then
+            object x = analyse_modrm(s,i)
+            if atom(x) then
+                return x
+            end if
+            i = x[$]
+            x = unify_operands(x)
+            sequence mnemos = {"inc","dec","call dword","call far","jmp dword","jmp far","push dword"}
+            sequence mnemonix = mnemos[x[1]+1]
+            if op<2 then
+                if sequence(x[2]) then
+                    sequence size_spec
+                    if flag_size=0 then
+                        size_spec = "byte"
+                    elsif size_prefix=1 then
+                        size_spec = "word"
+                    else
+                        size_spec = "dword"
+                    end if
+                    text = sprintf("%s %s %s",{mnemonix,size_spec,op_to_text(x[2])})
+                else
+                    sequence reg = regs[x[2]+1][1+flag_size*2-size_prefix]
+                    text = sprintf("%s %s",{mnemonix,reg})
+                end if
+            elsif flag_size then
+                text = sprintf("%s %s%s",{mnemonix,seg_prefix,op_to_text(x[2])})
+            end if
+        end if
+    elsif s[i] = #0F then
+        i += 1
+        if and_bits(s[i],#F0)=SETCC[2] and and_bits(s[i+1],#C0)=#C0 then
+            integer condition = and_bits(s[i],#0F)
+            sequence reg = regs[and_bits(s[i+1],7)][1] -- 8bit regs
+            text = sprintf("set%s %s",{conds[condition+1],reg})
+            i += 2
+        elsif and_bits(s[i],#F0)=JCC_NEAR[2] then
+            if length(s)<i+4 then
+                return length(s)-(i+4)
+            end if
+            integer condition = and_bits(s[i],#0F)
+            atom immediate = addr+5+check_sign_bit(bytes_to_int(s[i+1..i+4]),32)
+            text = sprintf("j%s near %s",{conds[condition+1], asmhex(immediate)})
+            i += 5
+        elsif find(and_bits(s[i],#FE), {MOVZX[2], MOVSX[2]}) then
+            integer op = and_bits(s[i],#FE)
+            integer flag_size = and_bits(s[i],1)
             object x = analyse_modrm(s,i+1)
             if atom(x) then
                 return x
             end if
-            if x[1][2] = 7 then
-                i = x[$]
-                x = unify_operands(x)
-                text = "cmp "
-                if flags = 0 then
-                    text &= "byte "
-                else
-                    text &= "dword "
-                end if
-                text &= op_to_text(x[2]) & ", "
-                atom immediate
-                if flags = 1 then
-                    if length(s)<i+3 then
-                        return s-(i+3)
-                    end if
-                    immediate = bytes_to_int(s[i..i+3])
-                    i += 4
-                else
-                    if length(s)<i then
-                        return length(s)-i
-                    end if
-                    immediate = s[i]
-                    i += 1
-                end if
-                text &= asmhex(immediate)
-            end if
-        end if
-    elsif s[i] = #FF then
-        i += 1
-        if s[i] = JMP_INDIR[2] then
-            atom immediate = bytes_to_int(s[i+1..i+4])
-            text = sprintf("jmp dword %s[%s]",{op_prefix,asmhex(immediate)})
-            i += 5
-        elsif and_bits(s[i],#38) = PUSH_INDIR[2] then
-            object x = analyse_modrm(s,i) -- байт mod r/m накладывается на опкод
-            if atom(x) then
-                return x
-            end if
             i = x[$]
             x = unify_operands(x)
-            text = sprintf("push dword %s%s", {op_prefix, op_to_text(x[2])})
-        elsif and_bits(s[i],#38) = CALL_INDIR[2] then
-            object x = analyse_modrm(s,i) -- байт mod r/m накладывается на опкод
-            if atom(x) then
-                return x
+            sequence reg = regs[x[1]+1][1+flag_size*2]
+            sequence size_spec = op_sizes[flag_size+1]
+            sequence mnemonix
+            if op=MOVZX[2] then
+                mnemonix = "movzx"
+            else
+                mnemonix = "movsx"
             end if
-            i = x[$]
-            x = unify_operands(x)
-            text = sprintf("call dword %s%s", {op_prefix, op_to_text(x[2])})
+            text = sprintf("%s %s, %s %s", {mnemonix, reg, size_spec, op_to_text(x[2])})
         end if
     end if
     
