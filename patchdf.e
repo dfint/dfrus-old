@@ -159,7 +159,8 @@ function fix_len(atom fn, atom off, integer oldlen, integer len,
                 end if
             elsif pre[$-5] = MOV_REG_IMM + 8 + EDI and
                     bytes_to_int(pre[$-4..$-1]) = oldlen then -- mov edi,len ; до
-                if debug and oldlen = 15 and len > oldlen and length(aft)>0 then
+                -- if debug and oldlen = 15 and len > oldlen and length(aft)>0 then
+                if debug and oldlen = 15 and length(aft)>0 then
                     integer i = 1
                     if sequence(orig) and sequence(transl) then
                         printf(1,"Translating '%s' to '%s':\n", {orig,transl})
