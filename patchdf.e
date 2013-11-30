@@ -113,12 +113,18 @@ include disasm.e
 constant count = #20, count_after = #80
 public
 function fix_len(atom fn, atom off, integer oldlen, integer len,
-                    object orig = 0, object transl = 0, atom address = 0) -- optional debugging params
+                    object optionals = 0) -- optional debugging params
     atom next = off+4, oldnext
     sequence pre = fpeek(fn, {off-count,count}),
              aft = fpeek(fn, {next,count_after})
     integer r, reg
     integer jmp = 0
+    object orig = 0, transl = 0, address = 0
+    if not atom(optionals) and length(optionals)=3 then
+        orig = optionals[1]
+        transl = optionals[2]
+        address = optionals[3]
+    end if
     
     if aft[1] = JMP_SHORT or aft[1] = JMP_NEAR then
         integer disp -- смещение jmp
