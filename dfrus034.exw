@@ -239,7 +239,8 @@ for i = 1 to length(strings) do
         end if
         object fix = fix_len(fn, refs[j], length(strings[i][STR]), length(translation), optionals)
         if sequence(fix) then -- не удалось исправить длину по причине джампа
-            if length(fix)<3 then
+            if length(fix)=2 then
+                -- short jump - возвращены только исходный адрес и адрес перехода
                 if debug then
                     printf(1,"Unable to add stitch at #%x for |%s|%s| (short jump to #%x)\n", {
                         off_to_rva_ex(fix[1],sections[1])+image_base,
