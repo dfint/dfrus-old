@@ -253,7 +253,7 @@ for i = 1 to length(strings) do
                 -- Функция fix_len наткнулась на jmp и вернула машинный код указания длины и адрес перехода
                 -- {src, jmp_or_call, mach, dest} = fix
                 integer src = fix[1]
-                integer jmp_or_call = fix[2]
+                object jmp_or_call = fix[2]
                 sequence mach = fix[3]
                 integer dest = fix[4]
                 
