@@ -253,10 +253,16 @@ for i = 1 to length(strings) do
                 -- Функция fix_len наткнулась на jmp и вернула машинный код указания длины и адрес перехода
                 -- {src, jmp_or_call, mach, dest} = fix
                 integer src = fix[1]
-                -- object jmp_or_call = fix[2]
                 integer jmp_or_call = fix[2]
                 sequence mach = fix[3]
                 atom dest = fix[4]
+                
+                if debug then
+                    printf(1,"%x %d ",{off_to_rva_ex(src,sections[1])+image_base,
+                        jmp_or_call})
+                    print(1,mach)
+                    printf(1," %x\n",off_to_rva_ex(dest,sections[1])+image_base)
+                end if
                 
                 atom
                     stitch_off = new_sect_off,

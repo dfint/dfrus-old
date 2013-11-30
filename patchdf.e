@@ -187,7 +187,7 @@ function fix_len(atom fn, atom off, integer oldlen, integer len,
                         if aft[i]=CALL_NEAR then
                             -- exit
                             atom disp = check_sign_bit(bytes_to_int(aft[i+1..i+4]),32)
-                            return {next+i+1, aft[i],
+                            return {next+i, JMP_NEAR,
                                 (MOV_RM_IMM + 1) & glue_triads(1,0,ESI) & #14 & int_to_bytes(15), -- mov [esi+14h], 15
                                 next+i+4+disp}
                         end if
