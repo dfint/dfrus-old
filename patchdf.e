@@ -165,10 +165,10 @@ function fix_len(atom fn, atom off, integer oldlen, integer len,
                 end if
             elsif pre[$-5] = MOV_REG_IMM + 8 + EDI and
                     bytes_to_int(pre[$-4..$-1]) = oldlen then -- mov edi,len ; до
-                -- if debug and oldlen = 15 and len > oldlen and length(aft)>0 then
-                if debug and oldlen = 15 and length(aft)>0 then
+                fpoke4(fn, off-5, len)
+                if oldlen = 15 and length(aft)>0 then
                     integer i = 1
-                    if sequence(orig) and sequence(transl) then
+                    if debug and sequence(orig) and sequence(transl) then
                         printf(1,"Translating '%s' to '%s':\n", {orig,transl})
                     end if
                     while i<length(aft) do
@@ -176,17 +176,24 @@ function fix_len(atom fn, atom off, integer oldlen, integer len,
                         if atom(x) then
                             exit
                         end if
-                        printf(1,"%08x\t%s\n",x[1..$-1])
+                        if debug then
+                            printf(1,"%08x\t%s\n",x[1..$-1])
+                        end if
                         if aft[i]=CALL_NEAR then
-                            exit
+                            -- exit
+                            printf(1,"%d %x",repeat(bytes_to_int(aft[i+1..i+4]),2))
+                            atom disp = check_sign_bit(bytes_to_int(aft[i+1..i+4]),32)
+                            return {next+i+1, aft[i],
+                                (MOV_RM_IMM + 1) & glue_triads(1,0,ESI) & #14 & int_to_bytes(15), -- mov [esi+14h], 15
+                                next+i+5+disp}
                         end if
                         i = x[$]
                     end while
                     
-                    -- getc(0)
-                    puts(1,'\n')
+                    if debug then
+                        puts(1,'\n')
+                    end if
                 end if
-                fpoke4(fn, off-5, len)
                 return 1
             elsif length(aft)>0 and aft[1] = MOV_REG_IMM + 8 + EDI and
                     bytes_to_int(aft[2..5]) = oldlen then -- mov edi,len ; после
