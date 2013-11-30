@@ -159,7 +159,7 @@ function fix_len(atom fn, atom off, integer oldlen, integer len,
                     return 1
                 elsif jmp = JMP_NEAR then
                     -- Возвращаем адрес команды перехода, маш. код указания длины строки и новый адрес перехода:
-                    return {oldnext, {PUSH_IMM8, len}, next+2} -- push len8
+                    return {oldnext, jmp, {PUSH_IMM8, len}, next+2} -- push len8
                 else -- jmp = JMP_SHORT
                     return -1 -- короткий переход, невозможно добавить "петлю"
                 end if
@@ -230,7 +230,7 @@ function fix_len(atom fn, atom off, integer oldlen, integer len,
                         not  (pre[$-3]=MOV_REG_RM+1 and and_bits(pre[$-2],#F8)=glue_triads(3,reg,0)) then -- mov reg1, reg2
                     -- @TODO: Упростить это условие!!! возможно нужно всего лишь проверять чтобы перед push был jmp
                     -- Возвращаем адрес команды перехода, маш. код указания длины строки и старый адрес перехода:
-                    return {oldnext, {POP_REG+reg, PUSH_IMM8, len}, next} -- pop REG \\ push len
+                    return {oldnext, jmp, {POP_REG+reg, PUSH_IMM8, len}, next} -- pop REG \\ push len
                 end if
             -- elsif length(aft)>0 and and_bits(aft[1], #F8) = PUSH_REG and aft[2] = JMP_NEAR then
                 -- mov eax, offset str; push reg; jmp near somewhere - не найдено ни одного случая
