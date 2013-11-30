@@ -119,11 +119,12 @@ function fix_len(atom fn, atom off, integer oldlen, integer len,
              aft = fpeek(fn, {next,count_after})
     integer r, reg
     integer jmp = 0
-    object orig = 0, transl = 0, address = 0
+    object orig = 0, transl = 0, section = 0, image_base = 0
     if not atom(optionals) and length(optionals)=3 then
         orig = optionals[1]
         transl = optionals[2]
-        address = optionals[3]
+        section = optionals[3]
+        image_base = optionals[4]
     end if
     
     if aft[1] = JMP_SHORT or aft[1] = JMP_NEAR then
@@ -167,6 +168,7 @@ function fix_len(atom fn, atom off, integer oldlen, integer len,
                     bytes_to_int(pre[$-4..$-1]) = oldlen then -- mov edi,len ; до
                 -- if debug and oldlen = 15 and len > oldlen and length(aft)>0 then
                 if debug and oldlen = 15 and length(aft)>0 then
+                    atom address = off_to_rva_ex(next,section)
                     integer i = 1
                     if sequence(orig) and sequence(transl) then
                         printf(1,"Translating '%s' to '%s':\n", {orig,transl})
