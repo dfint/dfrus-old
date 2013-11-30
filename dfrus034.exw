@@ -235,7 +235,7 @@ for i = 1 to length(strings) do
         -- Исправить длину строки:
         object optionals = 0
         if debug then
-            optionals = {strings[i][STR], translation, off_to_rva_ex(refs[j], sections[1])+image_base}
+            optionals = {strings[i][STR], translation, sections[1], image_base}
         end if
         object fix = fix_len(fn, refs[j], length(strings[i][STR]), length(translation), optionals)
         if sequence(fix) then -- не удалось исправить длину по причине джампа
