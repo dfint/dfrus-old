@@ -251,10 +251,11 @@ for i = 1 to length(strings) do
                 end if
             else
                 -- Функция fix_len наткнулась на jmp и вернула машинный код указания длины и адрес перехода
-                -- {src, mach, dest} = fix
+                -- {src, jmp_or_call, mach, dest} = fix
                 integer src = fix[1]
-                sequence mach = fix[2]
-                integer dest = fix[3]
+                integer jmp_or_call = fix[2]
+                sequence mach = fix[3]
+                integer dest = fix[4]
                 
                 integer
                     stitch_off = new_sect_off,
@@ -263,7 +264,7 @@ for i = 1 to length(strings) do
                     disp = dest_rva-(stitch_rva+length(mach)+5), -- смещение перехода из петли
                     src_rva = off_to_rva_ex(src, sections[1])
                 
-                mach &= JMP_NEAR & int_to_bytes(disp) -- добавляем выход из петли в нужное место
+                mach &= jmp_or_call & int_to_bytes(disp) -- добавляем выход из петли в нужное место
                 -- Прописываем код петли в новую секцию:
                 new_sect_off = add_to_new_section(fn, new_sect_off, mach) 
                 disp = stitch_rva-(src_rva+5)

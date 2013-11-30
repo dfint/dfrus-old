@@ -195,7 +195,7 @@ function fix_len(atom fn, atom off, integer oldlen, integer len,
                     return 1
                 elsif jmp = JMP_NEAR then
                     -- Возвращаем адрес команды перехода, маш. код указания длины строки и старый адрес перехода:
-                    return {oldnext,
+                    return {oldnext, jmp,
                         (MOV_REG_IMM + 8 + EDI) & int_to_bytes(len), -- mov edi, len32
                         next+5}
                 else
