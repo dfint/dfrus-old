@@ -256,9 +256,9 @@ for i = 1 to length(strings) do
                 -- object jmp_or_call = fix[2]
                 integer jmp_or_call = fix[2]
                 sequence mach = fix[3]
-                integer dest = fix[4]
+                atom dest = fix[4]
                 
-                integer
+                atom
                     stitch_off = new_sect_off,
                     stitch_rva = off_to_rva_ex(stitch_off, new_section),
                     dest_rva = off_to_rva_ex(dest, sections[1]),
@@ -309,8 +309,8 @@ for i = 1 to length(strings) do
                 if length(mach) > x[1] then
                     -- Полученный машинный код не умещается на первоначальное место
                     sequence proc = mach & RET_NEAR -- Превращаем сгенерированный код в процедуру
-                    integer dest_off = new_sect_off,
-                            dest_rva = off_to_rva_ex(dest_off, new_section)
+                    atom dest_off = new_sect_off,
+                         dest_rva = off_to_rva_ex(dest_off, new_section)
                     -- По первоначальному местоположению копирующего кода пропишем вызов процедуры
                     integer disp = dest_rva-(start_rva+5)
                     mach = CALL_NEAR & int_to_bytes(disp)
