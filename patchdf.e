@@ -170,7 +170,7 @@ function fix_len(atom fn, atom off, integer oldlen, integer len,
                 if oldlen = 15 and length(aft)>0 then
                     atom address
                     if debug then
-                        address = off_to_rva_ex(next,section)
+                        address = off_to_rva_ex(next,section)+image_base
                     end if
                     integer i = 1
                     if debug and sequence(orig) and sequence(transl) then
@@ -186,11 +186,10 @@ function fix_len(atom fn, atom off, integer oldlen, integer len,
                         end if
                         if aft[i]=CALL_NEAR then
                             -- exit
-                            printf(1,"%d %x",repeat(bytes_to_int(aft[i+1..i+4]),2))
                             atom disp = check_sign_bit(bytes_to_int(aft[i+1..i+4]),32)
                             return {next+i+1, aft[i],
                                 (MOV_RM_IMM + 1) & glue_triads(1,0,ESI) & #14 & int_to_bytes(15), -- mov [esi+14h], 15
-                                next+i+5+disp}
+                                next+i+4+disp}
                         end if
                         i = x[$]
                     end while
