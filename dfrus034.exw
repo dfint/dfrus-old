@@ -234,11 +234,11 @@ for i = 1 to length(strings) do
     for j = 1 to length(refs) do
         -- Исправить длину строки:
         object fix
+        object optionals = 0
         if debug then
-            fix = fix_len(fn, refs[j], length(strings[i][STR]), length(translation), strings[i][STR], translation, off_to_rva_ex(refs[j], sections[1])+image_base)
-        else
-            fix = fix_len(fn, refs[j], length(strings[i][STR]), length(translation))
+            optionals = {strings[i][STR], translation, off_to_rva_ex(refs[j], sections[1])+image_base}
         end if
+        fix = fix_len(fn, refs[j], length(strings[i][STR]), length(translation), optionals)
         if sequence(fix) then -- не удалось исправить длину по причине джампа
             if length(fix)<3 then
                 if debug then
