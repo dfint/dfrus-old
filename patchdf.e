@@ -170,7 +170,7 @@ function fix_len(atom fn, atom off, integer oldlen, integer len,
                 if debug and oldlen = 15 and length(aft)>0 then
                     atom address
                     if debug then
-                        address = off_to_rva_ex(next,section)
+                        address = off_to_rva_ex(next,section) + image_base
                     end if
                     integer i = 1
                     if sequence(orig) and sequence(transl) then
