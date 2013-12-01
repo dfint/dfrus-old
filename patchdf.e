@@ -103,6 +103,16 @@ end function
 
 include disasm.e
 
+constant mach_strlen = {
+    XOR_RM_REG+1, glue_triads(3, ECX, ECX), -- xor ecx, ecx
+    XOR_RM_REG,   glue_triads(3, AL, AL), -- xor al, al
+    #F7, glue_triads(3, 2, ECX), -- not ecx
+    #FC, -- cld
+    REPNE, SCASB, -- nuff said
+    #F7, glue_triads(3, 2, ECX), -- not ecx
+    DEC_REG + ECX, -- dec ecx
+}
+
 -- Функция исправления длины, прописанной в коде
 -- Возвращает:
 -- 1 если удалось исправить длину,
