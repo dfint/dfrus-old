@@ -163,6 +163,7 @@ function fix_len(atom fn, atom off, integer oldlen, integer len,
                     return {oldnext, {PUSH_IMM8, len}, next+2} -- push len8
                 else -- jmp = JMP_SHORT
                     return -1 -- короткий переход, невозможно добавить "петлю"
+                    -- @TODO: найти ближайший call, заменить на вызов strlen с последующим переходом на нужную процедуру
                 end if
             elsif pre[$-5] = MOV_REG_IMM + 8 + EDI and
                     bytes_to_int(pre[$-4..$-1]) = oldlen then -- mov edi,len ; до
