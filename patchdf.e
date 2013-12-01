@@ -104,8 +104,8 @@ end function
 include disasm.e
 
 constant mach_strlen = {
-        PUSH_REG + EAX, -- push eax
         PUSH_REG + EDI, -- push edi
+        PUSH_REG + EAX, -- push eax
         PUSH_REG + ECX, -- push ecx
         MOV_REG_RM+1, glue_triads(3, EDI, EAX), -- mov edi, eax
         #FC, -- cld
@@ -118,8 +118,8 @@ constant mach_strlen = {
     },
     mach_strlen_tail = {
         POP_REG + ECX,
-        POP_REG + EDI,
-        POP_REG + EAX
+        POP_REG + EAX,
+        POP_REG + EDI
     }
 
 function find_instruction(sequence aft, integer instruct)
@@ -213,20 +213,13 @@ function fix_len(atom fn, atom off, integer oldlen, integer len,
                         address = off_to_rva_ex(next,section)+image_base
                     end if
                     integer i = 1
-                    -- if debug and sequence(orig) and sequence(transl) then
-                        -- printf(1,"Translating '%s' to '%s':\n", {orig,transl})
-                    -- end if
                     while i<length(aft) do
                         object x = disasm(address,aft,i)
                         if atom(x) then
                             exit
                         end if
-                        -- if debug then
-                            -- printf(1,"%08x\t%s\n",x[1..$-1])
-                        -- end if
                         if aft[i]=CALL_NEAR then
                             -- @TODO: Добавить проверку на присутствие команды mov [esp+N], edi
-                            -- exit
                             atom disp = check_sign_bit(bytes_to_int(aft[i+1..i+4]),32)
                             return {next+i-1,
                                 (MOV_RM_IMM + 1) & glue_triads(1,0,ESI) & #14 & int_to_bytes(15), -- mov [esi+14h], 15
@@ -234,26 +227,25 @@ function fix_len(atom fn, atom off, integer oldlen, integer len,
                         end if
                         i = x[$]
                     end while
-                    
-                    -- if debug then
-                        -- puts(1,'\n')
-                    -- end if
                 end if
                 return 1
             elsif length(aft)>0 and aft[1] = MOV_REG_IMM + 8 + EDI and
                     bytes_to_int(aft[2..5]) = oldlen then -- mov edi,len ; после
-                if not jmp then
+                if jmp then
+                    integer i = find_instruction(aft,CALL_NEAR)
+                    if i>0 then
+                        atom disp = check_sign_bit(bytes_to_int(aft[i+1..i+4]),32)
+                        return {next+i-1,
+                            mach_strlen[2..$] & -- without push edi
+                            {MOV_REG_RM+1, glue_triads(0,EDI,ECX)} & -- mov edi, ecx
+                            mach_strlen_tail[1..$-1], -- without pop edi
+                            next+i+4+disp}
+                    end if
+                else
                     fpoke4(fn, next+1, len)
                     return 1
-                elsif jmp = JMP_NEAR then
-                    -- Возвращаем адрес команды перехода, маш. код указания длины строки и старый адрес перехода:
-                    return {oldnext,
-                        (MOV_REG_IMM + 8 + EDI) & int_to_bytes(len), -- mov edi, len32
-                        next+5}
-                else
-                    -- return -1 -- короткий переход, невозможно добавить "петлю" - считаем что так и надо
-                    return {oldnext, next}
                 end if
+                return -1
             elsif pre[$-3]=LEA and and_bits(pre[$-2],#F8) = glue_triads(1,EDI,0) then -- lea edi, [reg+len]
                 integer disp = check_sign_bit(pre[$-1],8)
                 if disp=oldlen then

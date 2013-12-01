@@ -255,15 +255,15 @@ for i = 1 to length(strings) do
                 if map:has(fixes,fix[1]) then
                     if debug then
                         object fixed = map:get(fixes,fix[1])
-                        if not equal(fixed,fix[2]) then
+                        if not equal(fixed[2],fix[2]) then
                             puts(1,"Conflicting fixes:\n")
                             printf(1,"%x ", off_to_rva_ex(fixed[1],sections[1])+image_base)
                             print(1,fixed[2])
-                            printf(1," %x\n",off_to_rva_ex(fixed[3],sections[1])+image_base)
+                            printf(1," %x\n", off_to_rva_ex(fixed[3],sections[1])+image_base)
                             puts(1,"and\n")
                             printf(1,"%x ", off_to_rva_ex(fix[1],sections[1])+image_base)
                             print(1,fix[2])
-                            printf(1," %x\n",off_to_rva_ex(fix[3],sections[1])+image_base)
+                            puts(1,"\n\n")
                         end if
                     end if
                 else
@@ -273,11 +273,11 @@ for i = 1 to length(strings) do
                     sequence mach = fix[2]
                     atom dest = fix[3]
                     
-                    if debug then
-                        printf(1,"%x ", off_to_rva_ex(src,sections[1])+image_base)
-                        print(1,mach)
-                        printf(1," %x\n",off_to_rva_ex(dest,sections[1])+image_base)
-                    end if
+                    -- if debug then
+                        -- printf(1,"%x ", off_to_rva_ex(src,sections[1])+image_base)
+                        -- print(1,mach)
+                        -- printf(1," %x\n",off_to_rva_ex(dest,sections[1])+image_base)
+                    -- end if
                     
                     atom
                         stitch_off = new_sect_off,
@@ -286,15 +286,15 @@ for i = 1 to length(strings) do
                         disp = dest_rva-(stitch_rva+length(mach)+5), -- смещение перехода из петли
                         src_rva = off_to_rva_ex(src, sections[1])
                         
-                    if debug then
-                        printf(1,"%x\n",stitch_rva+image_base)
-                    end if
+                    -- if debug then
+                        -- printf(1,"%x\n",stitch_rva+image_base)
+                    -- end if
                     mach &= JMP_NEAR & int_to_bytes(disp) -- добавляем выход из петли в нужное место
                     -- Прописываем код петли в новую секцию:
                     new_sect_off = add_to_new_section(fn, stitch_off, mach)
                     disp = stitch_rva-(src_rva+5)
                     fpoke4(fn, src+1, disp) -- делаем переход на петлю
-                    map:put(fixes,fix[1],fix[2])
+                    map:put(fixes,fix[1],fix)
                 end if
             end if
             fix = -1 -- считаем, что длина строки исправлена (даже если наткнулись на short jmp)
