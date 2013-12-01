@@ -104,14 +104,38 @@ end function
 include disasm.e
 
 constant mach_strlen = {
-    XOR_RM_REG+1, glue_triads(3, ECX, ECX), -- xor ecx, ecx
-    XOR_RM_REG,   glue_triads(3, AL, AL), -- xor al, al
-    #F7, glue_triads(3, 2, ECX), -- not ecx
-    #FC, -- cld
-    REPNE, SCASB, -- nuff said
-    #F7, glue_triads(3, 2, ECX), -- not ecx
-    DEC_REG + ECX, -- dec ecx
-}
+        PUSH_REG + EAX, -- push eax
+        PUSH_REG + EDI, -- push edi
+        PUSH_REG + ECX, -- push ecx
+        MOV_REG_RM+1, glue_triads(3, EDI, EAX), -- mov edi, eax
+        #FC, -- cld
+        XOR_RM_REG+1, glue_triads(3, ECX, ECX), -- xor ecx, ecx
+        XOR_RM_REG+1, glue_triads(3, EAX, EAX), -- xor eax, eax
+        #F7, glue_triads(3, 2, ECX), -- not ecx
+        REPNE, SCASB, -- nuff said
+        #F7, glue_triads(3, 2, ECX), -- not ecx
+        DEC_REG + ECX -- dec ecx
+    },
+    mach_strlen_tail = {
+        POP_REG + ECX,
+        POP_REG + EDI,
+        POP_REG + EAX
+    }
+
+function find_instruction(sequence aft, integer instruct)
+    integer i = 1
+    while i<length(aft) do
+        object x = disasm(0,aft,i)
+        if atom(x) then
+            exit
+        end if
+        if aft[i]=instruct then
+            return i
+        end if
+        i = x[$]
+    end while
+    return 0
+end function
 
 -- ‘ункци€ исправлени€ длины, прописанной в коде
 -- ¬озвращает:
@@ -165,36 +189,41 @@ function fix_len(atom fn, atom off, integer oldlen, integer len,
                 fpoke(fn,off-2,len)
                 return 1
             elsif length(aft)>0 and aft[1] = PUSH_IMM8 and aft[2] = oldlen then -- push len
-                if not jmp then
+                if jmp then
+                    integer i = find_instruction(aft,CALL_NEAR)
+                    if i>0 then
+                        atom disp = check_sign_bit(bytes_to_int(aft[i+1..i+4]),32)
+                        return {next+i-1,
+                            mach_strlen &
+                            {MOV_RM_REG+1, glue_triads(1,ECX,4), glue_triads(0,4,ESP), 4*4} & -- mov [esp+4*4], ecx
+                            mach_strlen_tail,
+                            next+i+4+disp}
+                    end if
+                else
                     fpoke(fn, next+1, len)
                     return 1
-                elsif jmp = JMP_NEAR then
-                    -- ¬озвращаем адрес команды перехода, маш. код указани€ длины строки и новый адрес перехода:
-                    return {oldnext, {PUSH_IMM8, len}, next+2} -- push len8
-                else -- jmp = JMP_SHORT
-                    return -1 -- короткий переход, невозможно добавить "петлю"
-                    -- @TODO: найти ближайший call, заменить на вызов strlen с последующим переходом на нужную процедуру
                 end if
+                return -1
             elsif pre[$-5] = MOV_REG_IMM + 8 + EDI and
                     bytes_to_int(pre[$-4..$-1]) = oldlen then -- mov edi,len ; до
                 fpoke4(fn, off-5, len)
                 if oldlen = 15 and length(aft)>0 then
-                    atom address
+                    atom address = 0
                     if debug then
                         address = off_to_rva_ex(next,section)+image_base
                     end if
                     integer i = 1
-                    if debug and sequence(orig) and sequence(transl) then
-                        printf(1,"Translating '%s' to '%s':\n", {orig,transl})
-                    end if
+                    -- if debug and sequence(orig) and sequence(transl) then
+                        -- printf(1,"Translating '%s' to '%s':\n", {orig,transl})
+                    -- end if
                     while i<length(aft) do
                         object x = disasm(address,aft,i)
                         if atom(x) then
                             exit
                         end if
-                        if debug then
-                            printf(1,"%08x\t%s\n",x[1..$-1])
-                        end if
+                        -- if debug then
+                            -- printf(1,"%08x\t%s\n",x[1..$-1])
+                        -- end if
                         if aft[i]=CALL_NEAR then
                             -- @TODO: ƒобавить проверку на присутствие команды mov [esp+N], edi
                             -- exit
@@ -206,9 +235,9 @@ function fix_len(atom fn, atom off, integer oldlen, integer len,
                         i = x[$]
                     end while
                     
-                    if debug then
-                        puts(1,'\n')
-                    end if
+                    -- if debug then
+                        -- puts(1,'\n')
+                    -- end if
                 end if
                 return 1
             elsif length(aft)>0 and aft[1] = MOV_REG_IMM + 8 + EDI and

@@ -255,7 +255,7 @@ for i = 1 to length(strings) do
                 if map:has(fixes,fix[1]) then
                     if debug then
                         object fixed = map:get(fixes,fix[1])
-                        if not equal(fixed,fix) then
+                        if not equal(fixed,fix[2]) then
                             puts(1,"Conflicting fixes:\n")
                             printf(1,"%x ", off_to_rva_ex(fixed[1],sections[1])+image_base)
                             print(1,fixed[2])
@@ -294,7 +294,7 @@ for i = 1 to length(strings) do
                     new_sect_off = add_to_new_section(fn, stitch_off, mach)
                     disp = stitch_rva-(src_rva+5)
                     fpoke4(fn, src+1, disp) -- делаем переход на петлю
-                    map:put(fixes,fix[1],fix)
+                    map:put(fixes,fix[1],fix[2])
                 end if
             end if
             fix = -1 -- считаем, что длина строки исправлена (даже если наткнулись на short jmp)
