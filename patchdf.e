@@ -185,9 +185,10 @@ function fix_len(atom fn, atom off, integer oldlen, integer len,
                             printf(1,"%08x\t%s\n",x[1..$-1])
                         end if
                         if aft[i]=CALL_NEAR then
+                            -- @TODO: ƒобавить проверку на присутствие команды mov [esp+N], edi
                             -- exit
                             atom disp = check_sign_bit(bytes_to_int(aft[i+1..i+4]),32)
-                            return {next+i,
+                            return {next+i-1,
                                 (MOV_RM_IMM + 1) & glue_triads(1,0,ESI) & #14 & int_to_bytes(15), -- mov [esi+14h], 15
                                 next+i+4+disp}
                         end if
