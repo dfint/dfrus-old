@@ -335,6 +335,7 @@ op_FE_width_acc_imm[#1C+1] = "sbb"
 sequence shifts_rolls = {"rol","ror","rcl","rcr","shl","shr","sal","sar"}
 
 -- Набросок функции, по введенному машинному коду возвращающей его ассемблерное представление
+-- @TODO: возвращать не строку, а набор чисел, из которых клиентский код по необходимости собирает строку. Обдумать формат возвращаемого ряда чисел.
 public
 function disasm(integer start_addr, sequence s, integer i=1)
     sequence text, seg_prefix={}
