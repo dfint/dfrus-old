@@ -273,12 +273,6 @@ for i = 1 to length(strings) do
                     sequence mach = fix[2]
                     atom dest = fix[3]
                     
-                    -- if debug then
-                        -- printf(1,"%x ", off_to_rva_ex(src,sections[1])+image_base)
-                        -- print(1,mach)
-                        -- printf(1," %x\n",off_to_rva_ex(dest,sections[1])+image_base)
-                    -- end if
-                    
                     atom
                         stitch_off = new_sect_off,
                         stitch_rva = off_to_rva_ex(stitch_off, new_section),
@@ -286,9 +280,6 @@ for i = 1 to length(strings) do
                         disp = dest_rva-(stitch_rva+length(mach)+5), -- смещение перехода из петли
                         src_rva = off_to_rva_ex(src, sections[1])
                         
-                    -- if debug then
-                        -- printf(1,"%x\n",stitch_rva+image_base)
-                    -- end if
                     mach &= JMP_NEAR & int_to_bytes(disp) -- добавляем выход из петли в нужное место
                     -- Прописываем код петли в новую секцию:
                     new_sect_off = add_to_new_section(fn, stitch_off, mach)
