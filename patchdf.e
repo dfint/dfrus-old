@@ -264,17 +264,15 @@ function fix_len(atom fn, atom off, integer oldlen, integer len,
                     -- mov ecx,reg ++ push len не обрабатываем
                     return -1
                 end if
-            elsif and_bits(pre[$-1],#F8) = PUSH_REG and jmp = JMP_NEAR then
-                -- push reg; mov eax, offset str; jmp near somewhere
-                reg = and_bits(pre[$-1],7)
-                if reg != EAX and reg != EBP and -- pop eax затрет адрес строки, pop ebp - "особый случай"
-                        not ((pre[$-5]=LEA and and_bits(pre[$-4],#F8)=glue_triads(1,reg,0)) or -- lea modrm disp8
-                             (pre[$-7]=LEA and and_bits(pre[$-6],#F8)=glue_triads(2,reg,0)) or -- lea modrm disp32
-                             (pre[$-8]=LEA and pre[$-7]=glue_triads(2,reg,4))) and -- lea modrm sib disp32
-                        not  (pre[$-3]=MOV_REG_RM+1 and and_bits(pre[$-2],#F8)=glue_triads(3,reg,0)) then -- mov reg1, reg2
-                    -- @TODO: Упростить это условие!!! возможно нужно всего лишь проверять чтобы перед push был jmp
-                    -- Возвращаем адрес команды перехода, маш. код указания длины строки и старый адрес перехода:
-                    return {oldnext, {POP_REG+reg, PUSH_IMM8, len}, next} & jmp -- pop REG \\ push len
+            elsif and_bits(pre[$-1],#F8) = PUSH_REG then
+                integer i = find_instruction(aft,CALL_NEAR)
+                if i>0 then
+                    atom disp = check_sign_bit(bytes_to_int(aft[i+1..i+4]),32)
+                    return {next+i-1,
+                        mach_strlen &
+                        {MOV_RM_REG+1, glue_triads(1,ECX,4), glue_triads(0,4,ESP), 4*4} & -- mov [esp+4*4], ecx
+                        mach_strlen_tail,
+                        next+i+4+disp} & aft[i]
                 end if
             -- elsif length(aft)>0 and and_bits(aft[1], #F8) = PUSH_REG and aft[2] = JMP_NEAR then
                 -- mov eax, offset str; push reg; jmp near somewhere - не найдено ни одного случая
