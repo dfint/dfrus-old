@@ -229,6 +229,17 @@ function fix_len(atom fn, atom off, integer oldlen, integer len,
                     end while
                 end if
                 return 1
+            elsif pre[$-1]=MOV_REG_RM+1 and and_bits(pre[$],#F8)=glue_triads(3,EDI,0) then
+                -- mov edi,reg; mov eax, offset str
+                integer i = find_instruction(aft,CALL_NEAR)
+                if i>0 then
+                    atom disp = check_sign_bit(bytes_to_int(aft[i+1..i+4]),32)
+                    return {next+i-1,
+                        mach_strlen[2..$] & -- without push edi
+                        {MOV_REG_RM+1, glue_triads(0,EDI,ECX)} & -- mov edi, ecx
+                        mach_strlen_tail[1..$-1], -- without pop edi
+                        next+i+4+disp} & aft[i]
+                end if
             elsif length(aft)>0 and aft[1] = MOV_REG_IMM + 8 + EDI and
                     bytes_to_int(aft[2..5]) = oldlen then -- mov edi,len ; после
                 if jmp then
@@ -274,8 +285,9 @@ function fix_len(atom fn, atom off, integer oldlen, integer len,
                         mach_strlen_tail,
                         next+i+4+disp} & aft[i]
                 end if
-            -- elsif length(aft)>0 and and_bits(aft[1], #F8) = PUSH_REG and aft[2] = JMP_NEAR then
-                -- mov eax, offset str; push reg; jmp near somewhere - не найдено ни одного случая
+            -- elsif length(aft)>0 and and_bits(aft[1], #F8) = PUSH_REG then
+                -- mov eax, offset str; push reg
+                -- Вызов генератора, имеющего собственный strlen
             end if
         elsif reg = ESI then -- mov esi, offset str
             if pre[$-5] = MOV_REG_IMM + 8 + ECX and -- mov ecx, (len+1)/4
