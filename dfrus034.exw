@@ -270,7 +270,11 @@ for i = 1 to length(strings) do
                         end if
                     end if
                 else
-                    map:put(fixes,fix[1],fix)
+                    if fix[4]=JMP_NEAR then
+                        fix_it(fix[1],fix,0,0)
+                    else
+                        map:put(fixes,fix[1],fix)
+                    end if
                 end if
             end if
             fix = -1 -- считаем, что длина строки исправлена (даже если наткнулись на short jmp)
