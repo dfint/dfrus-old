@@ -16,6 +16,7 @@ include disasm.e
 with define DEBUG
 global integer debug = 0
 include patchdf.e
+include extract_strings.e
 
 sequence path = ""
 sequence cmd = command_line()
