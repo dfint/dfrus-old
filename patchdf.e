@@ -197,7 +197,7 @@ function fix_len(atom fn, atom off, integer oldlen, integer len,
                             mach_strlen &
                             {MOV_RM_REG+1, glue_triads(1,ECX,4), glue_triads(0,4,ESP), 4*4} & -- mov [esp+4*4], ecx
                             mach_strlen_tail,
-                            next+i+4+disp}
+                            next+i+4+disp} & aft[i]
                     end if
                 else
                     fpoke(fn, next+1, len)
@@ -223,7 +223,7 @@ function fix_len(atom fn, atom off, integer oldlen, integer len,
                             atom disp = check_sign_bit(bytes_to_int(aft[i+1..i+4]),32)
                             return {next+i-1,
                                 (MOV_RM_IMM + 1) & glue_triads(1,0,ESI) & #14 & int_to_bytes(15), -- mov [esi+14h], 15
-                                next+i+4+disp}
+                                next+i+4+disp} & aft[i]
                         end if
                         i = x[$]
                     end while
@@ -239,7 +239,7 @@ function fix_len(atom fn, atom off, integer oldlen, integer len,
                             mach_strlen[2..$] & -- without push edi
                             {MOV_REG_RM+1, glue_triads(0,EDI,ECX)} & -- mov edi, ecx
                             mach_strlen_tail[1..$-1], -- without pop edi
-                            next+i+4+disp}
+                            next+i+4+disp} & aft[i]
                     end if
                 else
                     fpoke4(fn, next+1, len)
@@ -274,7 +274,7 @@ function fix_len(atom fn, atom off, integer oldlen, integer len,
                         not  (pre[$-3]=MOV_REG_RM+1 and and_bits(pre[$-2],#F8)=glue_triads(3,reg,0)) then -- mov reg1, reg2
                     -- @TODO: Упростить это условие!!! возможно нужно всего лишь проверять чтобы перед push был jmp
                     -- Возвращаем адрес команды перехода, маш. код указания длины строки и старый адрес перехода:
-                    return {oldnext, {POP_REG+reg, PUSH_IMM8, len}, next} -- pop REG \\ push len
+                    return {oldnext, {POP_REG+reg, PUSH_IMM8, len}, next} & jmp -- pop REG \\ push len
                 end if
             -- elsif length(aft)>0 and and_bits(aft[1], #F8) = PUSH_REG and aft[2] = JMP_NEAR then
                 -- mov eax, offset str; push reg; jmp near somewhere - не найдено ни одного случая
