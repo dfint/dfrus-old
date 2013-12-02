@@ -187,7 +187,7 @@ if debug then
     end if
 end if
 
-map fixes = map:new()
+map funcs = map:new()
 
 constant OFF = 1, STR = 2
 for i = 1 to length(strings) do
@@ -242,7 +242,7 @@ for i = 1 to length(strings) do
         object fix = fix_len(fn, refs[j], length(strings[i][STR]), length(translation), optionals)
         if sequence(fix) then -- не удалось исправить длину по причине джампа
             if length(fix)=2 then
-                -- short jump - возвращены только исходный адрес и адрес перехода
+                -- возвращены только исходный адрес и адрес перехода
                 if debug then
                     printf(1,"Unable to add stitch at #%x for |%s|%s| (short jump to #%x)\n", {
                         off_to_rva_ex(fix[1],sections[1])+image_base,
@@ -253,28 +253,16 @@ for i = 1 to length(strings) do
                 end if
             else
                 -- Функция fix_len вернула смещение команды перехода, машинный код и смещение выхода
-                -- {src, mach, dest} = fix
-                if map:has(fixes,fix[1]) then
-                    if debug then
-                        object fixed = map:get(fixes,fix[1])
-                        if not equal(fixed[2],fix[2]) then
-                            puts(1,"Conflicting fixes:\n")
-                            printf(1,"%x ", off_to_rva_ex(fixed[1],sections[1])+image_base)
-                            print(1,fixed[2])
-                            printf(1," %x\n", off_to_rva_ex(fixed[3],sections[1])+image_base)
-                            puts(1,"and\n")
-                            printf(1,"%x ", off_to_rva_ex(fix[1],sections[1])+image_base)
-                            print(1,fix[2])
-                            printf(1," %x\n", off_to_rva_ex(fix[3],sections[1])+image_base)
-                            puts(1,"\n")
-                        end if
-                    end if
+                -- {src, mach, dest, op} = fix
+                if fix[4]=CALL_NEAR then
+                    -- Создаем таблицу функций (конструкторов строк)
+                    -- В будущем в этой таблице можно хранить информацию о способе передачи аргументов
+                    object x = map:get(funcs,fix[3],{map:new(),{}})
+                    map:put(x[1],fix[2],0) -- используем map как множество - важны только ключи
+                    x[2] &= fix[1]
+                    map:put(funcs,fix[3],x)
                 else
-                    if fix[4]=JMP_NEAR then
-                        fix_it(fix[1],fix,0,0)
-                    else
-                        map:put(fixes,fix[1],fix)
-                    end if
+                    fix_it(fix[1],fix,0,0)
                 end if
             end if
             fix = -1 -- считаем, что длина строки исправлена (даже если наткнулись на short jmp)
@@ -353,7 +341,7 @@ end for
 
 -- Отложенное исправление
 function fix_it(object key, object fix, object user_data, integer progress_code)
-    integer src = fix[1]
+    atom src = fix[1]
     sequence mach = fix[2]
     atom dest = fix[3]
     
@@ -372,7 +360,29 @@ function fix_it(object key, object fix, object user_data, integer progress_code)
     return 0
 end function
 
-for_each(fixes, routine_id("fix_it"))
+function add_call_hook(object key, object val, object user_data, integer progress_code)
+    sequence mach = flatten(map:keys(val[1]))
+    atom dest = key
+    atom
+        stitch_off = new_sect_off,
+        stitch_rva = off_to_rva_ex(stitch_off, new_section),
+        dest_rva = off_to_rva_ex(dest, sections[1]),
+        disp = dest_rva-(stitch_rva+length(mach)+5)
+    
+    mach &= JMP_NEAR & int_to_bytes(disp)
+    
+    new_sect_off = add_to_new_section(fn, stitch_off, mach)
+    
+    for i = 1 to length(val[2]) do
+        atom src = val[2][i]
+        atom src_rva = off_to_rva_ex(src, sections[1])
+        disp = stitch_rva-(src_rva+5)
+        fpoke4(fn, src+1, disp)
+    end for
+    return 0
+end function
+
+for_each(funcs, routine_id("add_call_hook"))
 
 -----------------------------------------------------------------------------
 -- Физическое добавление новой секции
