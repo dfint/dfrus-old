@@ -257,9 +257,8 @@ for i = 1 to length(strings) do
                 if fix[4]=CALL_NEAR then
                     -- Создаем таблицу функций (конструкторов строк)
                     -- В будущем в этой таблице можно хранить информацию о способе передачи аргументов
-                    object x = map:get(funcs,fix[3],{map:new(),{}})
-                    map:put(x[1],fix[2],0) -- используем map как множество - важны только ключи
-                    x[2] &= fix[1]
+                    map x = map:get(funcs,fix[3],map:new())
+                    map:put(x,fix[2],0) -- используем map как множество - важны только ключи
                     map:put(funcs,fix[3],x)
                 else
                     fix_it(fix[1],fix,0,0)
@@ -361,7 +360,7 @@ function fix_it(object key, object fix, object user_data, integer progress_code)
 end function
 
 function add_call_hook(object key, object val, object user_data, integer progress_code)
-    sequence mach = flatten(map:keys(val[1]))
+    sequence mach = flatten(map:keys(val))
     atom dest = key
     atom
         stitch_off = new_sect_off,
