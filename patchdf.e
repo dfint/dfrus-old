@@ -275,7 +275,7 @@ function fix_len(atom fn, atom off, integer oldlen, integer len,
                     -- mov ecx,reg ++ push len не обрабатываем
                     return -1
                 end if
-            elsif and_bits(pre[$-1],#F8) = PUSH_REG then
+            elsif and_bits(pre[$-1],#F8) = PUSH_REG and and_bits(pre[$-1],7)!=EAX then
                 integer i = find_instruction(aft,CALL_NEAR)
                 if i>0 then
                     atom disp = check_sign_bit(bytes_to_int(aft[i+1..i+4]),32)
