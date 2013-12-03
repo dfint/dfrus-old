@@ -258,7 +258,7 @@ for i = 1 to length(strings) do
                     -- Создаем таблицу функций (конструкторов строк)
                     -- В будущем в этой таблице можно хранить информацию о способе передачи аргументов
                     map x = map:get(funcs,fix[3],map:new())
-                    map:put(x,fix[2],0) -- используем map как множество - важны только ключи
+                    map:put(x,fix[2],1,ADD) -- используем map как множество - важны только ключи
                     map:put(funcs,fix[3],x)
                 else
                     fix_it(fix[1],fix,0,0)
@@ -368,7 +368,7 @@ function add_call_hook(object key, object val, object user_data, integer progres
         dest_rva = off_to_rva_ex(key, sections[1])
     
     printf(1,"%x\n",dest_rva+image_base)
-    ? map:keys(val)
+    ? map:pairs(val)
     
     sequence code = fpeek(fn, {key, #10})
     integer i = 1
