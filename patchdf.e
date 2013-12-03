@@ -248,7 +248,7 @@ function fix_len(atom fn, atom off, integer oldlen, integer len,
                         atom disp = check_sign_bit(bytes_to_int(aft[i+1..i+4]),32)
                         return {next+i-1,
                             mach_strlen[2..$] & -- without push edi
-                            {MOV_REG_RM+1, glue_triads(0,EDI,ECX)} & -- mov edi, ecx
+                            {MOV_REG_RM+1, glue_triads(3,EDI,ECX)} & -- mov edi, ecx
                             mach_strlen_tail[1..$-1], -- without pop edi
                             next+i+4+disp} & aft[i]
                     end if
