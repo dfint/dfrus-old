@@ -367,6 +367,9 @@ function add_call_hook(object key, object val, object user_data, integer progres
         stitch_rva = off_to_rva_ex(stitch_off, new_section),
         dest_rva = off_to_rva_ex(key, sections[1])
     
+    printf(1,"%x\n",dest_rva+image_base)
+    ? map:keys(val)
+    
     sequence code = fpeek(fn, {key, #10})
     integer i = 1
     while i<5+1 do -- 5 байт на jmp near + 1 байт т.к. i должен указывать как минимум на 6й байт
