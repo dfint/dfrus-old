@@ -366,19 +366,31 @@ function add_call_hook(object key, object val, object user_data, integer progres
     atom
         stitch_off = new_sect_off,
         stitch_rva = off_to_rva_ex(stitch_off, new_section),
-        dest_rva = off_to_rva_ex(dest, sections[1]),
-        disp = dest_rva-(stitch_rva+length(mach)+5)
+        dest_rva = off_to_rva_ex(key, sections[1])
+    
+    sequence code = fpeek(fn, {key, #10})
+    integer i = 1
+    while i<5+1 do -- 5 байт на jmp near + 1 байт т.к. i должен указывать как минимум на 6й байт
+        object x = disasm(0,code,i)
+        i = x[$]
+    end while
+    
+    sequence saved_code = code[1..i-1]
+    
+    mach &= saved_code
+    
+    atom disp = dest_rva+length(saved_code)-(stitch_rva+length(mach)+5)
     
     mach &= JMP_NEAR & int_to_bytes(disp)
     
     new_sect_off = add_to_new_section(fn, stitch_off, mach)
     
-    for i = 1 to length(val[2]) do
-        atom src = val[2][i]
-        atom src_rva = off_to_rva_ex(src, sections[1])
-        disp = stitch_rva-(src_rva+5)
-        fpoke4(fn, src+1, disp)
-    end for
+    atom src = key
+    atom src_rva = off_to_rva_ex(src, sections[1])
+    disp = stitch_rva-(src_rva+5)
+    fpoke(fn, src, JMP_NEAR)
+    fpoke4(fn, src+1, disp)
+    
     return 0
 end function
 
