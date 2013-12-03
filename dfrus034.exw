@@ -257,9 +257,8 @@ for i = 1 to length(strings) do
                 if fix[4]=CALL_NEAR then
                     -- Создаем таблицу функций (конструкторов строк)
                     -- В будущем в этой таблице можно хранить информацию о способе передачи аргументов
-                    object x = map:get(funcs,fix[3],{map:new(),{}})
-                    map:put(x[1],fix[2],0) -- используем map как множество - важны только ключи
-                    x[2] &= fix[1]
+                    map x = map:get(funcs,fix[3],map:new())
+                    map:put(x,fix[2],0) -- используем map как множество - важны только ключи
                     map:put(funcs,fix[3],x)
                 else
                     fix_it(fix[1],fix,0,0)
@@ -361,24 +360,36 @@ function fix_it(object key, object fix, object user_data, integer progress_code)
 end function
 
 function add_call_hook(object key, object val, object user_data, integer progress_code)
-    sequence mach = flatten(map:keys(val[1]))
+    sequence mach = flatten(map:keys(val))
     atom dest = key
     atom
         stitch_off = new_sect_off,
         stitch_rva = off_to_rva_ex(stitch_off, new_section),
-        dest_rva = off_to_rva_ex(dest, sections[1]),
-        disp = dest_rva-(stitch_rva+length(mach)+5)
+        dest_rva = off_to_rva_ex(key, sections[1])
+    
+    sequence code = fpeek(fn, {key, #10})
+    integer i = 1
+    while i<5+1 do -- 5 байт на jmp near + 1 байт т.к. i должен указывать как минимум на 6й байт
+        object x = disasm(0,code,i)
+        i = x[$]
+    end while
+    
+    sequence saved_code = code[1..i-1]
+    
+    mach &= saved_code
+    
+    atom disp = dest_rva+length(saved_code)-(stitch_rva+length(mach)+5)
     
     mach &= JMP_NEAR & int_to_bytes(disp)
     
     new_sect_off = add_to_new_section(fn, stitch_off, mach)
     
-    for i = 1 to length(val[2]) do
-        atom src = val[2][i]
-        atom src_rva = off_to_rva_ex(src, sections[1])
-        disp = stitch_rva-(src_rva+5)
-        fpoke4(fn, src+1, disp)
-    end for
+    atom src = key
+    atom src_rva = off_to_rva_ex(src, sections[1])
+    disp = stitch_rva-(src_rva+5)
+    fpoke(fn, src, JMP_NEAR)
+    fpoke4(fn, src+1, disp)
+    
     return 0
 end function
 
