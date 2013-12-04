@@ -724,7 +724,7 @@ function disasm(integer start_addr, sequence s, integer i=1)
 end function
 
 public
-procedure print_hex_seq(integer fn, sequence s, integer delim = " ")
+procedure print_hex_seq(integer fn, sequence s, object delim = " ")
     for i = 1 to length(s) do
         printf(fn, "%02x", s[i])
         puts(fn, delim)
