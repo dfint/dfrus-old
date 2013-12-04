@@ -103,24 +103,22 @@ end function
 
 include disasm.e
 
-constant mach_strlen = {
-        PUSH_REG + EDI, -- push edi
-        PUSH_REG + EAX, -- push eax
+function mach_strlen(sequence ins)
+    return {
         PUSH_REG + ECX, -- push ecx
-        MOV_REG_RM+1, glue_triads(3, EDI, EAX), -- mov edi, eax
-        #FC, -- cld
         XOR_RM_REG+1, glue_triads(3, ECX, ECX), -- xor ecx, ecx
-        XOR_RM_REG+1, glue_triads(3, EAX, EAX), -- xor eax, eax
-        #F7, glue_triads(3, 2, ECX), -- not ecx
-        REPNE, SCASB, -- nuff said
-        #F7, glue_triads(3, 2, ECX), -- not ecx
-        DEC_REG + ECX -- dec ecx
-    },
-    mach_strlen_tail = {
-        POP_REG + ECX,
-        POP_REG + EAX,
-        POP_REG + EDI
-    }
+        -- @@:
+        #80, #3c, #08, #00, -- cmp byte [eax+ecx], 0
+        #74, #0B, -- jz success
+        #81,#F9,80,#00,#00,#00, -- cmp ecx, N
+        JCC_SHORT+COND_G,#03+length(ins), -- jg skip
+        INC_REG + ECX, -- inc ecx
+        JMP_SHORT, #EF -- jmp @b
+        -- success:
+    } & ins
+    -- skip:
+    & POP_REG+ECX
+end function
 
 function find_instruction(sequence aft, integer instruct)
     integer i = 1
@@ -194,9 +192,7 @@ function fix_len(atom fn, atom off, integer oldlen, integer len,
                     if i>0 then
                         atom disp = check_sign_bit(bytes_to_int(aft[i+1..i+4]),32)
                         return {next+i-1,
-                            mach_strlen &
-                            {MOV_RM_REG+1, glue_triads(1,ECX,4), glue_triads(0,4,ESP), 4*4} & -- mov [esp+4*4], ecx
-                            mach_strlen_tail,
+                            mach_strlen({MOV_RM_REG+1, glue_triads(1,ECX,4), glue_triads(0,4,ESP), 3*4}), -- mov [ESP+4*4], ECX
                             next+i+4+disp} & aft[i]
                     end if
                 else
@@ -231,13 +227,12 @@ function fix_len(atom fn, atom off, integer oldlen, integer len,
                 return 1
             elsif pre[$-1]=MOV_REG_RM+1 and and_bits(pre[$],#F8)=glue_triads(3,EDI,0) then
                 -- mov edi,reg; mov eax, offset str
+                -- ни разу не срабатывает
                 integer i = find_instruction(aft,CALL_NEAR)
                 if i>0 then
                     atom disp = check_sign_bit(bytes_to_int(aft[i+1..i+4]),32)
                     return {next+i-1,
-                        mach_strlen[2..$] & -- without push edi
-                        {MOV_REG_RM+1, glue_triads(3,EDI,ECX)} & -- mov edi, ecx
-                        mach_strlen_tail[1..$-1], -- without pop edi
+                        mach_strlen({MOV_REG_RM+1, glue_triads(3,EDI,ECX)}), -- mov edi, ecx
                         next+i+4+disp} & aft[i]
                 end if
             elsif length(aft)>0 and aft[1] = MOV_REG_IMM + 8 + EDI and
@@ -247,10 +242,8 @@ function fix_len(atom fn, atom off, integer oldlen, integer len,
                     if i>0 then
                         atom disp = check_sign_bit(bytes_to_int(aft[i+1..i+4]),32)
                         return {next+i-1,
-                            mach_strlen[2..$] & -- without push edi
-                            {MOV_REG_RM+1, glue_triads(3,EDI,ECX)} & -- mov edi, ecx
-                            mach_strlen_tail[1..$-1], -- without pop edi
-                            next+i+4+disp} & aft[i]
+                            --mach_strlen({MOV_REG_RM+1, glue_triads(3,EDI,ECX)}), -- mov edi, ecx
+                            next+i+4+disp} --& aft[i]
                     end if
                 else
                     fpoke4(fn, next+1, len)
