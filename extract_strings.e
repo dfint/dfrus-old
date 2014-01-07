@@ -1,5 +1,8 @@
 -- Извлечение строк из исполняемого файла
 
+include std/map.e
+include std/io.e
+
 constant blocksize = 1024
 
 function forbidden(integer i)
