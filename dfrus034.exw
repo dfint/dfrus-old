@@ -178,9 +178,11 @@ if debug then
         integer lo=second(value(cmd[4])), hi=second(value(cmd[5]))
         if lo <= 0 or lo > length(strings) then
             lo = 1
+            printf(1,"Lower bound is too low or too high. Set to 1.\n",lo)
         end if
         if hi < lo or hi > length(strings) then
             hi = length(strings)
+            printf(1,"Higher bound is too low or too high. Set to %d.\n",hi)
         end if
         strings = strings[lo..hi]
         printf(1,"%d %d %d\n",{lo,floor((lo+hi)/2),hi})
