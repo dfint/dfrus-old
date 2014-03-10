@@ -179,7 +179,7 @@ if debug then
         if lo <= 0 or lo > length(strings) then
             lo = 1
         end if
-        if hi <= 0 or hi > length(strings) then
+        if hi <= lo or hi > length(strings) then
             hi = length(strings)
         end if
         strings = strings[lo..hi]
