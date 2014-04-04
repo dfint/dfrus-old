@@ -129,6 +129,10 @@ public constant MOVZX = {#0F,#B6}, MOVSX = {#0F,#BE}
 
 public constant MOVSB = #A4, MOVSD = #A5, MOVSW = PREFIX_OPERAND_SIZE & MOVSD
 
+public constant SCASB = #AE, SCASD = #AF
+
+public constant LODSB = #AC, LODSD = #AD
+
 public constant INC_REG = #40, -- + reg
                 DEC_REG = #48, -- + reg
                 $

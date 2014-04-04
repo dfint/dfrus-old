@@ -103,6 +103,38 @@ end function
 
 include disasm.e
 
+function mach_strlen(sequence ins)
+    return {
+        PUSH_REG + ECX, -- push ecx
+        XOR_RM_REG+1, glue_triads(3, ECX, ECX), -- xor ecx, ecx
+        -- @@:
+        #80, #3c, #08, #00, -- cmp byte [eax+ecx], 0
+        #74, #0B, -- jz success
+        #81,#F9,80,#00,#00,#00, -- cmp ecx, N
+        JCC_SHORT+COND_G,#03+length(ins), -- jg skip
+        INC_REG + ECX, -- inc ecx
+        JMP_SHORT, #EF -- jmp @b
+        -- success:
+    } & ins
+    -- skip:
+    & POP_REG+ECX
+end function
+
+function find_instruction(sequence aft, integer instruct)
+    integer i = 1
+    while i<length(aft) do
+        object x = disasm(0,aft,i)
+        if atom(x) then
+            exit
+        end if
+        if aft[i]=instruct then
+            return i
+        end if
+        i = x[$]
+    end while
+    return 0
+end function
+
 -- Функция исправления длины, прописанной в коде
 -- Возвращает:
 -- 1 если удалось исправить длину,
@@ -155,58 +187,69 @@ function fix_len(atom fn, atom off, integer oldlen, integer len,
                 fpoke(fn,off-2,len)
                 return 1
             elsif length(aft)>0 and aft[1] = PUSH_IMM8 and aft[2] = oldlen then -- push len
-                if not jmp then
+                if jmp then
+                    integer i = find_instruction(aft,CALL_NEAR)
+                    if i>0 then
+                        atom disp = check_sign_bit(bytes_to_int(aft[i+1..i+4]),32)
+                        return {next+i-1,
+                            mach_strlen({MOV_RM_REG+1, glue_triads(1,ECX,4), glue_triads(0,4,ESP), 3*4}), -- mov [ESP+4*4], ECX
+                            next+i+4+disp} & aft[i]
+                    end if
+                else
                     fpoke(fn, next+1, len)
                     return 1
-                elsif jmp = JMP_NEAR then
-                    -- Возвращаем адрес команды перехода, маш. код указания длины строки и новый адрес перехода:
-                    return {oldnext, jmp, {PUSH_IMM8, len}, next+2} -- push len8
-                else -- jmp = JMP_SHORT
-                    return -1 -- короткий переход, невозможно добавить "петлю"
                 end if
+                return -1
             elsif pre[$-5] = MOV_REG_IMM + 8 + EDI and
                     bytes_to_int(pre[$-4..$-1]) = oldlen then -- mov edi,len ; до
-                -- if debug and oldlen = 15 and len > oldlen and length(aft)>0 then
-                if debug and oldlen = 15 and length(aft)>0 then
-                    atom address
+                fpoke4(fn, off-5, len)
+                if oldlen = 15 and length(aft)>0 then
+                    atom address = 0
                     if debug then
                         address = off_to_rva_ex(next,section) + image_base
                     end if
                     integer i = 1
-                    if sequence(orig) and sequence(transl) then
-                        printf(1,"Translating '%s' to '%s':\n", {orig,transl})
-                    end if
                     while i<length(aft) do
                         object x = disasm(address,aft,i)
                         if atom(x) then
                             exit
                         end if
-                        printf(1,"%08x\t%s\n",x[1..$-1])
                         if aft[i]=CALL_NEAR then
-                            exit
+                            -- @TODO: Добавить проверку на присутствие команды mov [esp+N], edi
+                            atom disp = check_sign_bit(bytes_to_int(aft[i+1..i+4]),32)
+                            return {next+i-1,
+                                (MOV_RM_IMM + 1) & glue_triads(1,0,ESI) & #14 & int_to_bytes(15), -- mov [esi+14h], 15
+                                next+i+4+disp} & aft[i]
                         end if
                         i = x[$]
                     end while
-                    
-                    -- getc(0)
-                    puts(1,'\n')
                 end if
-                fpoke4(fn, off-5, len)
                 return 1
+            elsif pre[$-1]=MOV_REG_RM+1 and and_bits(pre[$],#F8)=glue_triads(3,EDI,0) then
+                -- mov edi,reg; mov eax, offset str
+                -- ни разу не срабатывает
+                integer i = find_instruction(aft,CALL_NEAR)
+                if i>0 then
+                    atom disp = check_sign_bit(bytes_to_int(aft[i+1..i+4]),32)
+                    return {next+i-1,
+                        mach_strlen({MOV_REG_RM+1, glue_triads(3,EDI,ECX)}), -- mov edi, ecx
+                        next+i+4+disp} & aft[i]
+                end if
             elsif length(aft)>0 and aft[1] = MOV_REG_IMM + 8 + EDI and
                     bytes_to_int(aft[2..5]) = oldlen then -- mov edi,len ; после
-                if not jmp then
+                if jmp then
+                    integer i = find_instruction(aft,CALL_NEAR)
+                    if i>0 then
+                        atom disp = check_sign_bit(bytes_to_int(aft[i+1..i+4]),32)
+                        return {next+i-1,
+                            --mach_strlen({MOV_REG_RM+1, glue_triads(3,EDI,ECX)}), -- mov edi, ecx
+                            next+i+4+disp} --& aft[i]
+                    end if
+                else
                     fpoke4(fn, next+1, len)
                     return 1
-                elsif jmp = JMP_NEAR then
-                    -- Возвращаем адрес команды перехода, маш. код указания длины строки и старый адрес перехода:
-                    return {oldnext, jmp,
-                        (MOV_REG_IMM + 8 + EDI) & int_to_bytes(len), -- mov edi, len32
-                        next+5}
-                else
-                    -- return -1 -- короткий переход, невозможно добавить "петлю" - считаем что так и надо
-                    return {oldnext, next}
                 end if
+                return -1
             elsif pre[$-3]=LEA and and_bits(pre[$-2],#F8) = glue_triads(1,EDI,0) then -- lea edi, [reg+len]
                 integer disp = check_sign_bit(pre[$-1],8)
                 if disp=oldlen then
@@ -225,20 +268,6 @@ function fix_len(atom fn, atom off, integer oldlen, integer len,
                     -- mov ecx,reg ++ push len не обрабатываем
                     return -1
                 end if
-            elsif and_bits(pre[$-1],#F8) = PUSH_REG and jmp = JMP_NEAR then
-                -- push reg; mov eax, offset str; jmp near somewhere
-                reg = and_bits(pre[$-1],7)
-                if reg != EAX and reg != EBP and -- pop eax затрет адрес строки, pop ebp - "особый случай"
-                        not ((pre[$-5]=LEA and and_bits(pre[$-4],#F8)=glue_triads(1,reg,0)) or -- lea modrm disp8
-                             (pre[$-7]=LEA and and_bits(pre[$-6],#F8)=glue_triads(2,reg,0)) or -- lea modrm disp32
-                             (pre[$-8]=LEA and pre[$-7]=glue_triads(2,reg,4))) and -- lea modrm sib disp32
-                        not  (pre[$-3]=MOV_REG_RM+1 and and_bits(pre[$-2],#F8)=glue_triads(3,reg,0)) then -- mov reg1, reg2
-                    -- @TODO: Упростить это условие!!! возможно нужно всего лишь проверять чтобы перед push был jmp
-                    -- Возвращаем адрес команды перехода, маш. код указания длины строки и старый адрес перехода:
-                    return {oldnext, jmp, {POP_REG+reg, PUSH_IMM8, len}, next} -- pop REG \\ push len
-                end if
-            -- elsif length(aft)>0 and and_bits(aft[1], #F8) = PUSH_REG and aft[2] = JMP_NEAR then
-                -- mov eax, offset str; push reg; jmp near somewhere - не найдено ни одного случая
             end if
         elsif reg = ESI then -- mov esi, offset str
             if pre[$-5] = MOV_REG_IMM + 8 + ECX and -- mov ecx, (len+1)/4

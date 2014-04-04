@@ -27,8 +27,9 @@ if debug then
     debug = 1
 end if
 
-if length(cmd)>2 then
+if length(cmd)>2 and (cmd[3][$]='\\' or cmd[3][$]='/') then
     path = cmd[3]
+    cmd = remove(cmd,3)
 end if
 
 constant df1 = path & "Dwarf Fortress.exe"
@@ -110,7 +111,7 @@ constant
 sequence relocs = get_relocations(fn,sections)
 
 -- ѕолучаем перекрЄстные ссылки:
-object xref_map = get_cross_references_to_map(fn,relocs,sections,image_base)
+map xref_map = get_cross_references_to_map(fn,relocs,sections,image_base)
 
 -----------------------------------------------------------------------------
 puts(1,"Enabling the cyrillic alphabet...\n")
@@ -174,8 +175,8 @@ end function
 sequence strings = extract_strings_map(fn, xref_map)
 if debug then
     printf(1,"%d strings extracted.\n", length(strings))
-    if length(cmd)>=5 then
-        integer lo=second(value(cmd[4])), hi=second(value(cmd[5]))
+    if length(cmd)>=4 then
+        integer lo=second(value(cmd[3])), hi=second(value(cmd[4]))
         if lo <= 0 or lo > length(strings) then
             lo = 1
             printf(1,"Lower bound is too low or too high. Set to 1.\n",lo)
@@ -189,6 +190,8 @@ if debug then
         printf(1,"From %x to %x total %d\n",{strings[1][1], strings[$][1], length(strings)})
     end if
 end if
+
+map funcs = map:new()
 
 constant OFF = 1, STR = 2
 for i = 1 to length(strings) do
@@ -243,7 +246,7 @@ for i = 1 to length(strings) do
         object fix = fix_len(fn, refs[j], length(strings[i][STR]), length(translation), optionals)
         if sequence(fix) then -- не удалось исправить длину по причине джампа
             if length(fix)=2 then
-                -- short jump - возвращены только исходный адрес и адрес перехода
+                -- возвращены только исходный адрес и адрес перехода
                 if debug then
                     printf(1,"Unable to add stitch at #%x for |%s|%s| (short jump to #%x)\n", {
                         off_to_rva_ex(fix[1],sections[1])+image_base,
@@ -253,29 +256,17 @@ for i = 1 to length(strings) do
                     })
                 end if
             else
-                -- ‘ункци€ fix_len наткнулась на jmp и вернула машинный код указани€ длины и адрес перехода
-                -- {src, jmp_or_call, mach, dest} = fix
-                integer src = fix[1]
-                object jmp_or_call = fix[2]
-                sequence mach = fix[3]
-                integer dest = fix[4]
-                
-                integer
-                    stitch_off = new_sect_off,
-                    stitch_rva = off_to_rva_ex(stitch_off, new_section),
-                    dest_rva = off_to_rva_ex(dest, sections[1]),
-                    disp = dest_rva-(stitch_rva+length(mach)+5), -- смещение перехода из петли
-                    src_rva = off_to_rva_ex(src, sections[1])
-                
-                mach &= jmp_or_call & int_to_bytes(disp) -- добавл€ем выход из петли в нужное место
-                -- ѕрописываем код петли в новую секцию:
-                new_sect_off = add_to_new_section(fn, new_sect_off, mach) 
-                disp = stitch_rva-(src_rva+5)
-                fpoke4(fn, src+1, disp) -- делаем переход на петлю
-                -- if debug then
-                    -- printf(1,"Added stitch at #%x for |%s|%s|\n",
-                        -- {src_rva+image_base, strings[i][STR],translation})
-                -- end if
+                -- ‘ункци€ fix_len вернула смещение команды перехода, машинный код и смещение выхода
+                -- {src, mach, dest, op} = fix
+                if fix[4]=CALL_NEAR then
+                    -- —оздаем таблицу функций (конструкторов строк)
+                    -- ¬ будущем в этой таблице можно хранить информацию о способе передачи аргументов
+                    map x = map:get(funcs,fix[3],map:new())
+                    map:put(x, fix[2], off_to_rva_ex(fix[1], sections[1]), APPEND)
+                    map:put(funcs,fix[3],x)
+                else
+                    fix_it(fix[1],fix,0,0)
+                end if
             end if
             fix = -1 -- считаем, что длина строки исправлена (даже если наткнулись на short jmp)
         end if
@@ -311,8 +302,8 @@ for i = 1 to length(strings) do
                 if length(mach) > x[1] then
                     -- ѕолученный машинный код не умещаетс€ на первоначальное место
                     sequence proc = mach & RET_NEAR -- ѕревращаем сгенерированный код в процедуру
-                    integer dest_off = new_sect_off,
-                            dest_rva = off_to_rva_ex(dest_off, new_section)
+                    atom dest_off = new_sect_off,
+                         dest_rva = off_to_rva_ex(dest_off, new_section)
                     -- ѕо первоначальному местоположению копирующего кода пропишем вызов процедуры
                     integer disp = dest_rva-(start_rva+5)
                     mach = CALL_NEAR & int_to_bytes(disp)
@@ -350,6 +341,76 @@ for i = 1 to length(strings) do
         end if
     end for
 end for
+
+-- ќтложенное исправление
+function fix_it(object key, object fix, object user_data, integer progress_code)
+    atom src = fix[1]
+    sequence mach = fix[2]
+    atom dest = fix[3]
+    
+    atom
+        stitch_off = new_sect_off,
+        stitch_rva = off_to_rva_ex(stitch_off, new_section),
+        dest_rva = off_to_rva_ex(dest, sections[1]),
+        disp = dest_rva-(stitch_rva+length(mach)+5), -- смещение перехода из петли
+        src_rva = off_to_rva_ex(src, sections[1])
+        
+    mach &= JMP_NEAR & int_to_bytes(disp) -- добавл€ем выход из петли в нужное место
+    -- ѕрописываем код петли в новую секцию:
+    new_sect_off = add_to_new_section(fn, stitch_off, mach)
+    disp = stitch_rva-(src_rva+5)
+    fpoke4(fn, src+1, disp) -- делаем переход на петлю
+    return 0
+end function
+
+function add_call_hook(object key, object val, object user_data, integer progress_code)
+    sequence mach = flatten(map:keys(val))
+    atom dest = key
+    atom
+        stitch_off = new_sect_off,
+        stitch_rva = off_to_rva_ex(stitch_off, new_section),
+        dest_rva = off_to_rva_ex(key, sections[1])
+    
+    if debug then
+        printf(1,"%x\n",dest_rva+image_base)
+        sequence pairs = map:pairs(val)
+        for i = 1 to length(pairs) do
+            print_hex_seq(1,pairs[i][1])
+            printf(1,": %d entries",length(pairs[i][2]))
+            if length(pairs[i][2])>0 then
+                printf(1,"\nFirst entry: %x\n",pairs[i][2][1]+image_base)
+            end if
+        end for
+        puts(1,"\n")
+    end if
+    
+    sequence code = fpeek(fn, {key, #10})
+    integer i = 1
+    while i<5+1 do -- 5 байт на jmp near + 1 байт т.к. i должен указывать как минимум на 6й байт
+        object x = disasm(0,code,i)
+        i = x[$]
+    end while
+    
+    sequence saved_code = code[1..i-1]
+    
+    mach &= saved_code
+    
+    atom disp = dest_rva+length(saved_code)-(stitch_rva+length(mach)+5)
+    
+    mach &= JMP_NEAR & int_to_bytes(disp)
+    
+    new_sect_off = add_to_new_section(fn, stitch_off, mach)
+    
+    atom src = key
+    atom src_rva = off_to_rva_ex(src, sections[1])
+    disp = stitch_rva-(src_rva+5)
+    fpoke(fn, src, JMP_NEAR)
+    fpoke4(fn, src+1, disp)
+    
+    return 0
+end function
+
+for_each(funcs, routine_id("add_call_hook"))
 
 -----------------------------------------------------------------------------
 -- ‘изическое добавление новой секции
