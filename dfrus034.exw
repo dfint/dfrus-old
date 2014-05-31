@@ -7,6 +7,7 @@ include std/get.e
 include std/sequence.e
 include std/map.e
 include std/convert.e
+include std/text.e -- for trim()
 
 with trace
 include patcher.e
@@ -29,6 +30,17 @@ end if
 
 if length(cmd)>2 then
     path = cmd[3]
+end if
+
+-- Workaround for a bug described here: http://openeuphoria.org/ticket/897.wc
+if length(path)>0 then
+  if path[$]='\"' then
+      path=trim(path,'\"')
+  end if
+
+  if path[$]!='\\' then
+      path&='\\'
+  end if
 end if
 
 constant df1 = path & "Dwarf Fortress.exe"
