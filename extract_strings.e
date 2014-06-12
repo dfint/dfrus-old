@@ -10,7 +10,7 @@ function forbidden(integer i)
 end function
 
 function allowed(integer i)
-    return i='\r' or (i>=' ' and i<127 and not forbidden(i))
+    return i='\r' or i='\t' or (i>=' ' and i<127 and not forbidden(i))
 end function
 
 function letter(integer i)
