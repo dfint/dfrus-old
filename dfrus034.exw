@@ -15,6 +15,8 @@ include disasm.e
 
 with define DEBUG
 global integer debug = 0
+constant make_call_hooks = 0
+
 include patchdf.e
 include extract_strings.e
 
@@ -258,7 +260,7 @@ for i = 1 to length(strings) do
             else
                 -- Функция fix_len вернула смещение команды перехода, машинный код и смещение выхода
                 -- {src, mach, dest, op} = fix
-                if fix[4]=CALL_NEAR then
+                if fix[4]=CALL_NEAR and make_call_hooks then
                     -- Создаем таблицу функций (конструкторов строк)
                     -- В будущем в этой таблице можно хранить информацию о способе передачи аргументов
                     map x = map:get(funcs,fix[3],map:new())
@@ -410,7 +412,9 @@ function add_call_hook(object key, object val, object user_data, integer progres
     return 0
 end function
 
-for_each(funcs, routine_id("add_call_hook"))
+if make_call_hooks then
+    for_each(funcs, routine_id("add_call_hook"))
+end if
 
 -----------------------------------------------------------------------------
 -- Физическое добавление новой секции
