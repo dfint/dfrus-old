@@ -7,6 +7,7 @@ include std/get.e
 include std/sequence.e
 include std/map.e
 include std/convert.e
+include std/text.e -- for trim()
 
 with trace
 include patcher.e
@@ -29,9 +30,19 @@ if debug then
     debug = 1
 end if
 
-if length(cmd)>2 and (cmd[3][$]='\\' or cmd[3][$]='/') then
+if length(cmd)>2 then
     path = cmd[3]
-    cmd = remove(cmd,3)
+end if
+
+-- Workaround for a bug described here: http://openeuphoria.org/ticket/897.wc
+if length(path)>0 then
+  if path[$]='\"' then
+      path=trim(path,'\"')
+  end if
+
+  if path[$]!='\\' then
+      path&='\\'
+  end if
 end if
 
 constant df1 = path & "Dwarf Fortress.exe"
@@ -177,8 +188,8 @@ end function
 sequence strings = extract_strings_map(fn, xref_map)
 if debug then
     printf(1,"%d strings extracted.\n", length(strings))
-    if length(cmd)>=4 then
-        integer lo=second(value(cmd[3])), hi=second(value(cmd[4]))
+    if length(cmd)>=5 then
+        integer lo=second(value(cmd[4])), hi=second(value(cmd[5]))
         if lo <= 0 or lo > length(strings) then
             lo = 1
             printf(1,"Lower bound is too low or too high. Set to 1.\n",lo)
