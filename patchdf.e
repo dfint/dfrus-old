@@ -516,7 +516,7 @@ function mach_memcpy(integer src, sequence dest, integer count) -- (адрес, {реги
     return mach & new_ref_off
 end function
 
--- Процедура добавления чего-либо в новую секцию с выравниванием и добиванием нулями
+-- Процедура добавления в файл последовательности байт с выравниванием 
 public
 function add_to_new_section(integer fn, atom dest, sequence s, integer alignment = 4)
     integer aligned = align(length(s),alignment)
