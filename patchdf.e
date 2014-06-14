@@ -46,9 +46,9 @@ function load_trans_file_to_map(sequence fname)
         line = match_replace("\\r", line, "\r")
         line = match_replace("\\t", line, "\t")
         x = split(line, '|')
-        if length(x)>3 then
+        if length(x)>3 and length(x[2])>0 then
             if map:has(trans,x[2]) and debug then
-                printf(1,"Warning: there already is '%s' key in the map.\n",{x[2]})
+                printf(1,"Warning: there already is '%s' key in the map. Previously stored value is replaced.\n",{x[2]})
             end if
             map:put(trans,x[2],x[3])
         end if
