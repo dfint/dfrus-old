@@ -56,7 +56,7 @@ function load_trans_file_to_map(sequence fname)
     return trans
 end function
 
-constant code=1, rdata = 2, data = 3
+public constant code=1, rdata = 2, data = 3
 public
 function get_cross_references_to_map(atom fn, sequence relocs, sequence sections, atom image_base)
     atom obj

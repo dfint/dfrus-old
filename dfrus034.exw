@@ -254,7 +254,7 @@ for i = 1 to length(strings) do
         -- Исправить длину строки:
         object optionals = 0
         if debug then
-            optionals = {strings[i][STR], translation, sections[1], image_base}
+            optionals = {strings[i][STR], translation, sections[code], image_base}
         end if
         object fix = fix_len(fn, refs[j], length(strings[i][STR]), length(translation), optionals)
         if sequence(fix) then -- не удалось исправить длину по причине джампа
@@ -262,10 +262,10 @@ for i = 1 to length(strings) do
                 -- возвращены только исходный адрес и адрес перехода
                 if debug then
                     printf(1,"Unable to add stitch at #%x for |%s|%s| (short jump to #%x)\n", {
-                        off_to_rva_ex(fix[1],sections[1])+image_base,
+                        off_to_rva_ex(fix[1],sections[code])+image_base,
                         strings[i][STR],
                         translation,
-                        off_to_rva_ex(fix[2],sections[1])+image_base
+                        off_to_rva_ex(fix[2],sections[code])+image_base
                     })
                 end if
             else
@@ -275,7 +275,7 @@ for i = 1 to length(strings) do
                     -- Создаем таблицу функций (конструкторов строк)
                     -- В будущем в этой таблице можно хранить информацию о способе передачи аргументов
                     map x = map:get(funcs,fix[3],map:new())
-                    map:put(x, fix[2], off_to_rva_ex(fix[1], sections[1]), APPEND)
+                    map:put(x, fix[2], off_to_rva_ex(fix[1], sections[code]), APPEND)
                     map:put(funcs,fix[3],x)
                 else
                     fix_it(fix[1],fix,0,0)
@@ -286,7 +286,7 @@ for i = 1 to length(strings) do
         if fix != 0 then -- Удалось исправить длину, или исправление не требуется
             if fix = -2 and debug then -- не удалось исправить длину, но скорее всего нужно
                 printf(1,"|%s|%s| <- %x (%x)\n",
-                    {strings[i][STR], translation} & refs[j] & ( off_to_rva_ex(refs[j], sections[1])+image_base ) )
+                    {strings[i][STR], translation} & refs[j] & ( off_to_rva_ex(refs[j], sections[code])+image_base ) )
                 puts(1, "SUSPICIOUS: Failed to fix length.\n") -- скорее всего код поломался
             end if
             if long then -- Если строка длинная, то исправить ссылку на строку в коде:
@@ -310,7 +310,7 @@ for i = 1 to length(strings) do
                 if sequence(x[4]) then
                     mach &= lea(x[4][1],x[4][2..3])
                 end if
-                integer start_rva = off_to_rva_ex(start, sections[1]) -- RVA начала изменяемого кода
+                integer start_rva = off_to_rva_ex(start, sections[code]) -- RVA начала изменяемого кода
                 integer new_ref -- Адрес новой ссылки
                 if length(mach) > x[1] then
                     -- Полученный машинный код не умещается на первоначальное место
@@ -323,7 +323,7 @@ for i = 1 to length(strings) do
                     if length(mach) > x[1] then -- 5 > x[1]
                         if debug then
                             printf(1,"|%s|%s| <- %x (%x)\n",
-                                {strings[i][STR], translation} & refs[j] & ( off_to_rva_ex(refs[j], sections[1])+image_base ) )
+                                {strings[i][STR], translation} & refs[j] & ( off_to_rva_ex(refs[j], sections[code])+image_base ) )
                             printf(1, "Mach code is too long (%d against %d).\n",{length(mach),x[1]})
                         end if
                         continue -- полученный машинный код не уместился
@@ -343,12 +343,12 @@ for i = 1 to length(strings) do
                     fpoke(fn, start, mach)
                 elsif debug then
                     printf(1,"|%s|%s| <- %x (%x)\n",
-                        {strings[i][STR], translation} & refs[j] & ( off_to_rva_ex(refs[j], sections[1])+image_base ) )
+                        {strings[i][STR], translation} & refs[j] & ( off_to_rva_ex(refs[j], sections[code])+image_base ) )
                     printf(1, "Failed to fix relocations (Returned #%x).\n",mod_reloc)
                 end if
             elsif debug then
                 printf(1,"|%s|%s| <- %x (%x)\n",
-                    {strings[i][STR], translation} & refs[j] & ( off_to_rva_ex(refs[j], sections[1])+image_base ) )
+                    {strings[i][STR], translation} & refs[j] & ( off_to_rva_ex(refs[j], sections[code])+image_base ) )
                 printf(1,"Failed to obtain copying code length (Returned %d).\n",x)
             end if
         end if
@@ -364,9 +364,9 @@ function fix_it(object key, object fix, object user_data, integer progress_code)
     atom
         stitch_off = new_sect_off,
         stitch_rva = off_to_rva_ex(stitch_off, new_section),
-        dest_rva = off_to_rva_ex(dest, sections[1]),
+        dest_rva = off_to_rva_ex(dest, sections[code]),
         disp = dest_rva-(stitch_rva+length(mach)+5), -- смещение перехода из петли
-        src_rva = off_to_rva_ex(src, sections[1])
+        src_rva = off_to_rva_ex(src, sections[code])
         
     mach &= JMP_NEAR & int_to_bytes(disp) -- добавляем выход из петли в нужное место
     -- Прописываем код петли в новую секцию:
@@ -382,7 +382,7 @@ function add_call_hook(object key, object val, object user_data, integer progres
     atom
         stitch_off = new_sect_off,
         stitch_rva = off_to_rva_ex(stitch_off, new_section),
-        dest_rva = off_to_rva_ex(key, sections[1])
+        dest_rva = off_to_rva_ex(key, sections[code])
     
     if debug then
         printf(1,"%x\n",dest_rva+image_base)
@@ -415,7 +415,7 @@ function add_call_hook(object key, object val, object user_data, integer progres
     new_sect_off = add_to_new_section(fn, stitch_off, mach)
     
     atom src = key
-    atom src_rva = off_to_rva_ex(src, sections[1])
+    atom src_rva = off_to_rva_ex(src, sections[code])
     disp = stitch_rva-(src_rva+5)
     fpoke(fn, src, JMP_NEAR)
     fpoke4(fn, src+1, disp)
