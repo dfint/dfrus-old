@@ -157,6 +157,13 @@ patch_unicode_table(fn, off)
 -- puts(1,"Preparing additional data section...\n")
 -- Подготовка дополнительной секции данных
 
+if equal(sections[$][SECTION_NAME],".rus") then
+	close(fn)
+    puts(1,"There is '.rus' section in the file already.\n")
+    any_key()
+    abort(-1)
+end if
+
 constant
     file_alignment = fpeek4u(fn,pe_header+PE_FILE_ALIGNMENT),
     section_alignment = fpeek4u(fn,pe_header+PE_SECTION_ALIGNMENT)
