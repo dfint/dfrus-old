@@ -2,12 +2,18 @@
 
 include std/console.e
 include std/sequence.e
+include std/map.e
+include std/search.e
+
+with trace
 
 include pe.e
 include patcher.e
 include patchdf.e
 
-constant df = "..\\Dwarf Fortress.exe"
+include extract_strings.e
+
+constant df = "d:\\Games\\df_40_02_win\\Dwarf Fortress.exe"
 
 atom fn = open_pe(df)
 
@@ -22,58 +28,29 @@ global constant
     image_base = fpeek4u(fn, pe_header+PE_IMAGE_BASE),
     sections = get_section_table(fn, pe_header)
 
--- Получаем адреса всех перемещаемых элементов:
-sequence
-    relocs = get_relocations(fn,sections),
-    xref_table = get_cross_references(fn,relocs,sections,image_base),
-    objs  = xref_table[1],
-    xrefs = xref_table[2]
-
 -- Найти среди объектов строки
 
 constant blocksize = 1024
 
-function forbidden(integer i)
-    return find(i,"$;<>@^_`{|}")
-end function
+--function forbidden(integer i)
+--    return find(i,"$;<>@^_`{|}")
+--end function
 
-function allowed(integer i)
-    return i='\r' or (i>=' ' and i<127 and not forbidden(i))
-end function
+--function allowed(integer i)
+--    return i='\r' or (i>=' ' and i<127 and not forbidden(i))
+--end function
 
-sequence strings = {}
-object buf
-integer len
+-- Получаем адреса всех перемещаемых элементов:
+sequence relocs = get_relocations(fn,sections)
 
-for i = 1 to length(objs) do
-    -- исключить ссылки на середины строк:
-    if length(strings)>0 and objs[i]<=strings[$][1]+len then
-        continue
-    end if
-    -- считываем блок данных:
-    seek(fn, objs[i])
-    buf = get_bytes(fn,blocksize)
-    if atom(buf) then
-        puts(1,"I/O error\n")
-        any_key()
-        abort(-1)
-    end if
-    -- проверяем, является ли данный объект строкой:
-    len = -1
-    for j = 1 to length(buf) do
-        if buf[j] = 0 then
-            len = j-1
-            exit
-        elsif not allowed(buf[j]) then
-            exit
-        end if
-    end for
-    if len>0 then
-        strings = append(strings,{objs[i],buf[1..len]})
-    end if
-end for
+-- Получаем перекрёстные ссылки:
+map xref_map = get_cross_references_to_map(fn,relocs,sections,image_base)
+
+sequence strings = extract_strings_map(fn, xref_map)
 
 for i=1 to length(strings) do
+    strings[i][2] = match_replace('\n',strings[i][2],"\\n")
+    strings[i][2] = match_replace('\r',strings[i][2],"\\r")
     printf(1,"%x|%s|\n",strings[i])
 end for
 -- any_key()
