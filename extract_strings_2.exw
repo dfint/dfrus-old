@@ -49,8 +49,9 @@ map xref_map = get_cross_references_to_map(fn,relocs,sections,image_base)
 sequence strings = extract_strings_map(fn, xref_map)
 
 for i=1 to length(strings) do
-    strings[i][2] = match_replace('\n',strings[i][2],"\\n")
+    strings[i][2] = match_replace('\t',strings[i][2],"\\t")
     strings[i][2] = match_replace('\r',strings[i][2],"\\r")
-    printf(1,"%x|%s|\n",strings[i])
+    strings[i][1]=(strings[i][1]-sections[rdata][SECTION_POFFSET])/4
+    printf(1,"%08x|%s|\n",strings[i])
 end for
 -- any_key()
