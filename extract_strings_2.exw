@@ -1,5 +1,3 @@
--- Набросок нового алгоритма вытаскивания строк из exe файла (для патча версии 0.34.*)
-
 include std/console.e
 include std/sequence.e
 include std/map.e
@@ -13,12 +11,20 @@ include patchdf.e
 
 include extract_strings.e
 
-constant df = "d:\\Games\\df_40_02_win\\Dwarf Fortress.exe"
+constant cmd = command_line()
+sequence df
+if length(cmd)>=3 then
+    df = cmd[3]
+else
+    puts(2,"No filename given.")
+    any_key()
+    abort(1)
+end if
 
 atom fn = open_pe(df)
 
 if fn<0 then
-    puts(1,"File not found.\n")
+    puts(2,"File not found.\n")
     any_key()
     abort(1)
 end if
@@ -27,18 +33,6 @@ constant pe_header = check_pe(fn) -- todo: проверка валидности
 global constant
     image_base = fpeek4u(fn, pe_header+PE_IMAGE_BASE),
     sections = get_section_table(fn, pe_header)
-
--- Найти среди объектов строки
-
-constant blocksize = 1024
-
---function forbidden(integer i)
---    return find(i,"$;<>@^_`{|}")
---end function
-
---function allowed(integer i)
---    return i='\r' or (i>=' ' and i<127 and not forbidden(i))
---end function
 
 -- Получаем адреса всех перемещаемых элементов:
 sequence relocs = get_relocations(fn,sections)
