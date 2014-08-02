@@ -208,6 +208,11 @@ if debug then
         strings = strings[lo..hi]
         printf(1,"%d %d %d\n",{lo,floor((lo+hi)/2),hi})
         printf(1,"From %x to %x total %d\n",{strings[1][1], strings[$][1], length(strings)})
+        if length(strings)<10 then
+            for i = 1 to length(strings) do
+                printf(1,"%x|%s|\n",strings[i])
+            end for
+        end if
     end if
 end if
 
