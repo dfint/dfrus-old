@@ -9,7 +9,7 @@ include std/map.e
 include std/convert.e
 include std/text.e -- for trim()
 
-with trace
+--with trace
 include patcher.e
 include pe.e
 include disasm.e
@@ -35,17 +35,22 @@ if length(cmd)>2 then
 end if
 
 -- Workaround for a bug described here: http://openeuphoria.org/ticket/897.wc
-if length(path)>0 then
-  if path[$]='\"' then
-      path=trim(path,'\"')
-  end if
-
-  if path[$]!='\\' then
-      path&='\\'
-  end if
+if length(path)>0 and path[$]='\"' then
+    path=trim(path,'\"')
 end if
 
-constant df1 = path & "Dwarf Fortress.exe"
+sequence s_pathinfo = pathinfo(path)
+
+sequence df1
+
+if length(s_pathinfo[2])=0 then
+    path = s_pathinfo[$] & ':' & s_pathinfo[1] & '\\'
+    df1 =  path & "Dwarf Fortress.exe"
+else
+    df1 = path
+    path = s_pathinfo[$] & ':' & s_pathinfo[1] & '\\'
+end if
+
 constant df2 = path & "Dwarf Fortress Rus.exe"
 atom fn, pe_header
 
