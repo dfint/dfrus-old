@@ -10,6 +10,10 @@ include std/convert.e
 include std/text.e -- for trim()
 
 --with trace
+ifdef EUI then
+    with profile
+end ifdef
+
 include patcher.e
 include pe.e
 include disasm.e
