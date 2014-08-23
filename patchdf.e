@@ -208,21 +208,28 @@ function fix_len(atom fn, atom off, integer oldlen, integer len,
                     if debug then
                         address = off_to_rva_ex(next,section) + image_base
                     end if
-                    integer i = 1
-                    while i<length(aft) do
-                        object x = disasm(address,aft,i)
-                        if atom(x) then
-                            exit
-                        end if
-                        if aft[i]=CALL_NEAR then
-                            -- @TODO: ƒобавить проверку на присутствие команды mov [esp+N], edi
-                            atom disp = check_sign_bit(bytes_to_int(aft[i+1..i+4]),32)
-                            return {next+i-1,
-                                (MOV_RM_IMM + 1) & glue_triads(1,0,ESI) & #14 & int_to_bytes(15), -- mov [esi+14h], 15
-                                next+i+4+disp} & aft[i]
-                        end if
-                        i = x[$]
-                    end while
+                    integer i = find_instruction(aft, CALL_NEAR)
+                    if i > 0 then
+                        atom disp = check_sign_bit(bytes_to_int(aft[i+1..i+4]),32)
+                        return {next+i-1,
+                            (MOV_RM_IMM + 1) & glue_triads(1,0,ESI) & #14 & int_to_bytes(15), -- mov [esi+14h], 15
+                            next+i+4+disp} & aft[i]
+                    end if
+                    -- —ледующий код эквивалентен предыдущему, но возможно нужна проверка на присутствие команды mov [esp+N], edi ?
+                    -- while i<length(aft) do
+                        -- object x = disasm(address,aft,i)
+                        -- if atom(x) then
+                            -- exit
+                        -- end if
+                        -- if aft[i]=CALL_NEAR then
+                            -- -- @TODO: ƒобавить проверку на присутствие команды mov [esp+N], edi
+                            -- atom disp = check_sign_bit(bytes_to_int(aft[i+1..i+4]),32)
+                            -- return {next+i-1,
+                                -- (MOV_RM_IMM + 1) & glue_triads(1,0,ESI) & #14 & int_to_bytes(15), -- mov [esi+14h], 15
+                                -- next+i+4+disp} & aft[i]
+                        -- end if
+                        -- i = x[$]
+                    -- end while
                 end if
                 return 1
             elsif pre[$-1]=MOV_REG_RM+1 and and_bits(pre[$],#F8)=glue_triads(3,EDI,0) then
