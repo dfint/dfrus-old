@@ -47,14 +47,17 @@ sequence s_pathinfo = pathinfo(path)
 
 sequence df1
 
-if length(s_pathinfo[2])=0 then
+if length(path)=0 then -- путь не указан вообще
+    df1 = "Dwarf Fortress.exe"
+elsif length(s_pathinfo[2])=0 then -- указан путь без имени файла
     path = s_pathinfo[$] & ':' & s_pathinfo[1] & '\\'
     df1 =  path & "Dwarf Fortress.exe"
-else
+else -- указан путь с именем файла
     df1 = path
     path = s_pathinfo[$] & ':' & s_pathinfo[1] & '\\'
 end if
 
+-- @TODO: ƒобавить проверку на совпадение df1 и df2
 constant df2 = path & "Dwarf Fortress Rus.exe"
 atom fn, pe_header
 
