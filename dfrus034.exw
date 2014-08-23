@@ -295,7 +295,7 @@ for i = 1 to length(strings) do
                     map:put(x, fix[2], off_to_rva_ex(fix[1], sections[code]), APPEND)
                     map:put(funcs,fix[3],x)
                 else
-                    fix_it(fix[1],fix,0,0)
+                    fix_it(fix[1],fix)
                 end if
             end if
             fix = -1 -- считаем, что длина строки исправлена (даже если наткнулись на short jmp)
@@ -373,7 +373,7 @@ for i = 1 to length(strings) do
 end for
 
 -- Отложенное исправление
-function fix_it(object key, object fix, object user_data, integer progress_code)
+function fix_it(object key, object fix, object user_data = 0, integer progress_code = 0)
     atom src = fix[1]
     sequence mach = fix[2]
     atom dest = fix[3]
