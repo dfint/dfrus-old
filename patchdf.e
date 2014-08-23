@@ -115,9 +115,9 @@ function mach_strlen(sequence ins)
         INC_REG + ECX, -- inc ecx
         JMP_SHORT, #EF -- jmp @b
         -- success:
-    } & ins
+    } & ins -- some code
     -- skip:
-    & POP_REG+ECX
+    & POP_REG+ECX -- pop ecx
 end function
 
 function find_instruction(sequence aft, integer instruct)
