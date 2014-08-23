@@ -214,9 +214,35 @@ public constant
     IMAGE_REL_BASED_LOW         = 2,
     IMAGE_REL_BASED_HIGHLOW     = 3
 
--- function highlow(integer i)
-    -- return and_bits(i, #1000*IMAGE_REL_BASED_HIGHLOW)
--- end function
+public
+function get_reloc_table(atom fn, atom offset, atom reloc_size)
+    sequence reloc_table = {}
+    atom cur_page, block_size, cur_off = 0
+    seek(fn, offset)
+    while cur_off < reloc_size do
+        cur_page = get_integer32(fn)
+        block_size = get_integer32(fn)
+        sequence relocs = get_words(fn, floor((block_size-8)/2))
+        reloc_table = append(reloc_table, {cur_page, relocs})
+        cur_off += block_size
+    end while
+    return reloc_table
+end function
+
+public
+function table_to_relocs(sequence reloc_table)
+    sequence relocs = {}
+    for i = 1 to length(reloc_table) do
+        atom cur_page = reloc_table[i][1]
+        for j = 1 to length(reloc_table[i][2]) do
+            atom record = reloc_table[i][2][j]
+            if and_bits(record, #3000) = #1000*IMAGE_REL_BASED_HIGHLOW then
+                relocs &= cur_page + and_bits(record, #0FFF)
+            end if
+        end for
+    end for
+    return relocs
+end function
 
 public
 function get_relocations(atom fn, object sections = 0)
@@ -226,22 +252,43 @@ function get_relocations(atom fn, object sections = 0)
     end if
     atom reloc_off = rva_to_off(dd[DD_BASERELOC][1], sections),
          reloc_size = dd[DD_BASERELOC][2]
-    sequence relocs = {}
-    integer cur_page, block_size, cur_off = 0, rec
-    seek(fn,reloc_off)
-    while cur_off < reloc_size do
-        cur_page = get_integer32(fn)
-        block_size = get_integer32(fn)
-        for i = 1 to floor((block_size-8)/2) do
-            rec = get_integer16(fn)
-            if and_bits(rec, #1000*IMAGE_REL_BASED_HIGHLOW) then
-                relocs &= cur_page + and_bits(rec, #0FFF)
-            end if
-        end for
-        cur_off += block_size
-    end while
-    return relocs
+    return table_to_relocs( get_reloc_table(fn, reloc_off, reloc_size ) )
 end function
+
+public
+function relocs_to_table(sequence relocs)
+    sequence reloc_table = {}
+    atom cur_page = 0, page, off
+    integer padding_words = 0
+    for i = 1 to length(relocs) do
+        {page, off} = and_bits(relocs[i], {#FFFFF000, #00000FFF})
+        if page > cur_page then
+            if length(reloc_table)>0 and remainder(length(reloc_table[$][2]), 2) = 1 then
+                reloc_table[$][2] &= #1000*IMAGE_REL_BASED_ABSOLUTE + 0
+                padding_words += 1
+            end if
+            reloc_table = append(reloc_table, {page, {}})
+            page = cur_page
+        elsif page < cur_page then
+            return -1
+        end if
+        reloc_table[$][2] &= #1000*IMAGE_REL_BASED_HIGHLOW + off
+    end for
+    integer reloc_table_size = length(reloc_table)*8 + (length(relocs)+padding_words)*2
+    return {reloc_table_size, reloc_table}
+end function
+
+public
+procedure write_relocation_table(atom fn, atom offset, sequence reloc_table)
+    seek(fn, offset)
+    for i = 1 to length(reloc_table) do
+        if remainder(length(reloc_table[i][2]),2)=1 then
+            reloc_table[i][2] &= #1000*IMAGE_REL_BASED_ABSOLUTE + 0
+        end if
+        write_dwords(fn, {reloc_table[i][1], length(reloc_table[i][2])*2 + 8})
+        write_words(fn, reloc_table[i][2])
+    end for
+end procedure
 
 -- mod = {+add, -remove}
 public

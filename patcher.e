@@ -137,8 +137,7 @@ procedure fpoke(atom fn, atom off, object x)
 end procedure
 
 public
-procedure fpoke2(atom fn, atom off, object x)
-    seek(fn,off)
+procedure write_words(atom fn, object x)
     if atom(x) then
         puts(fn,and_bits(x,#00FF))
         puts(fn,floor(x/#100))
@@ -151,9 +150,14 @@ procedure fpoke2(atom fn, atom off, object x)
 end procedure
 
 public
-procedure fpoke4(atom fn, atom off, object x)
-    sequence s
+procedure fpoke2(atom fn, atom off, object x)
     seek(fn,off)
+    write_words(fn, x)
+end procedure
+
+public
+procedure write_dwords(atom fn, object x)
+    sequence s
     if atom(x) then
         puts(fn,int_to_bytes(x))
     else
@@ -163,4 +167,10 @@ procedure fpoke4(atom fn, atom off, object x)
         end for
         puts(fn,s)
     end if
+end procedure
+
+public
+procedure fpoke4(atom fn, atom off, object x)
+    seek(fn,off)
+    write_dwords(fn, x)
 end procedure
