@@ -9,8 +9,8 @@ include std/map.e
 include std/convert.e
 include std/text.e -- for trim()
 
---with trace
 ifdef EUI then
+    with trace
     with profile
 end ifdef
 
