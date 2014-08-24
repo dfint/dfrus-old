@@ -230,6 +230,21 @@ function get_reloc_table(atom fn, atom offset, atom reloc_size)
 end function
 
 public
+function get_reloc_table_map(atom fn, atom offset, atom reloc_size)
+    map reloc_table = map:new()
+    atom cur_page, block_size, cur_off = 0
+    seek(fn, offset)
+    while cur_off < reloc_size do
+        cur_page = get_integer32(fn)
+        block_size = get_integer32(fn)
+        sequence relocs = get_words(fn, floor((block_size-8)/2))
+        map:put(reloc_table, cur_page, relocs)
+        cur_off += block_size
+    end while
+    return reloc_table
+end function
+
+public
 function table_to_relocs(sequence reloc_table)
     sequence relocs = {}
     for i = 1 to length(reloc_table) do
