@@ -298,7 +298,12 @@ for i = 1 to length(strings) do
                 if fix[4]=CALL_NEAR and make_call_hooks then
                     -- Создаем таблицу функций (конструкторов строк)
                     -- В будущем в этой таблице можно хранить информацию о способе передачи аргументов
-                    map x = map:get(funcs,fix[3],map:new())
+                    map x
+                    if not map:has(funcs, fix[3]) then
+                        x = map:new()
+                    else
+                        x = map:get(funcs,fix[3])
+                    end if
                     map:put(x, fix[2], off_to_rva_ex(fix[1], sections[code]), APPEND)
                     map:put(funcs,fix[3],x)
                 else
