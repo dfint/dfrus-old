@@ -5,6 +5,7 @@ include std/convert.e
 include std/math.e
 include std/sequence.e
 include std/search.e
+include std/map.e
 
 public constant
     -- IMAGE_DOS_HEADER
