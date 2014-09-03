@@ -261,7 +261,9 @@ function relocs_to_table(sequence relocs)
     atom cur_page = 0, page, off
     integer padding_words = 0
     for i = 1 to length(relocs) do
-        {page, off} = and_bits(relocs[i], {#FFFFF000, #00000FFF})
+        page = and_bits(relocs[i], #FFFFF000)
+        off = and_bits(relocs[i], #00000FFF)
+        -- {page, off} = and_bits(relocs[i], {#FFFFF000, #00000FFF})
         if page > cur_page then
             if length(reloc_table)>0 and remainder(length(reloc_table[$][2]), 2) = 1 then
                 reloc_table[$][2] &= #1000*IMAGE_REL_BASED_ABSOLUTE + 0
