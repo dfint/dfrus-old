@@ -139,7 +139,7 @@ public
 procedure put_section_info(atom fn, atom off, sequence section)
     sequence s
     seek(fn,off)
-    section[1] &= repeat(0,8) -- Pad with zeros
+    section[1] = pad_tail(section[1], 8, 0) -- Pad with zeros
     puts(fn,section[1][1..8])
     for i = 2 to 7 do
         puts(fn,int_to_bytes(section[i]))
