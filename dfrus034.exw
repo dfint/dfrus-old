@@ -253,7 +253,7 @@ for i = 1 to length(strings) do
         for j = 1 to length(refs) do
             sequence x = map:get(xref_map, strings[i][OFF]+l)
             integer delta = refs[j] - x[1]
-            if length(x[1]) = 1 and delta>0 and delta<=6 then -- 6 - длина команды MOV REG, [IMM32]
+            if length(x) = 1 and delta>0 and delta<=6 then -- 6 - длина команды MOV REG, [IMM32]
                 refs[j] = x[1]
             end if
         end for
@@ -282,10 +282,10 @@ for i = 1 to length(strings) do
         end if
         object fix = fix_len(fn, refs[j], length(strings[i][STR]), length(translation), optionals)
         if sequence(fix) then -- не удалось исправить длину по причине джампа
-            if length(fix)=2 then
+            if length(fix)<4 then
                 -- возвращены только исходный адрес и адрес перехода
                 if debug then
-                    printf(1,"Unable to add stitch at #%x for |%s|%s| (short jump to #%x)\n", {
+                    printf(1,"Unable to add stitch at #%x for |%s|%s| (jump or call to address #%x)\n", {
                         off_to_rva_ex(fix[1],sections[code])+image_base,
                         strings[i][STR],
                         translation,
