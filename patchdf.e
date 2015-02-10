@@ -187,7 +187,11 @@ function fix_len(atom fn, atom off, integer oldlen, integer len,
                 fpoke(fn,off-2,len)
                 return 1
             elsif length(aft)>0 and aft[1] = PUSH_IMM8 and aft[2] = oldlen then -- push len
-                if jmp then
+                if jmp = JMP_NEAR then
+                    return {oldnext+1 -1, -- jmp operand address
+                        {PUSH_IMM8, len},
+                        next+2, jmp} -- instuction after mov edi, len
+                elsif jmp = JMP_SHORT then
                     integer i = find_instruction(aft,CALL_NEAR)
                     if i>0 then
                         atom disp = check_sign_bit(bytes_to_int(aft[i+1..i+4]),32)
@@ -235,22 +239,26 @@ function fix_len(atom fn, atom off, integer oldlen, integer len,
             elsif pre[$-1]=MOV_REG_RM+1 and and_bits(pre[$],#F8)=glue_triads(3,EDI,0) then
                 -- mov edi,reg; mov eax, offset str
                 -- ни разу не срабатывает
-                integer i = find_instruction(aft,CALL_NEAR)
+                integer i = find_instruction(aft, CALL_NEAR)
                 if i>0 then
                     atom disp = check_sign_bit(bytes_to_int(aft[i+1..i+4]),32)
                     return {next+i-1,
                         mach_strlen({MOV_REG_RM+1, glue_triads(3,EDI,ECX)}), -- mov edi, ecx
-                        next+i+4+disp} & aft[i]
+                        next+i+4+disp} & CALL_NEAR
                 end if
             elsif length(aft)>0 and aft[1] = MOV_REG_IMM + 8 + EDI and
                     bytes_to_int(aft[2..5]) = oldlen then -- mov edi,len ; после
-                if jmp then
-                    integer i = find_instruction(aft,CALL_NEAR)
+                if jmp = JMP_NEAR then
+                    return {oldnext+1-1, -- jmp operand address
+                        MOV_REG_IMM + 8 + EDI & int_to_bytes(len),
+                        next+5, jmp} -- instuction after mov edi, len
+                elsif jmp = JMP_SHORT then
+                    integer i = find_instruction(aft, CALL_NEAR)
                     if i>0 then
                         atom disp = check_sign_bit(bytes_to_int(aft[i+1..i+4]),32)
                         return {next+i-1,
                             --mach_strlen({MOV_REG_RM+1, glue_triads(3,EDI,ECX)}), -- mov edi, ecx
-                            next+i+4+disp} --& aft[i]
+                            next+i+4+disp} --& CALL_NEAR
                     end if
                 else
                     fpoke4(fn, next+1, len)
