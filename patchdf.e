@@ -257,8 +257,8 @@ function fix_len(atom fn, atom off, integer oldlen, integer len,
                     if i>0 then
                         atom disp = check_sign_bit(bytes_to_int(aft[i+1..i+4]),32)
                         return {next+i-1,
-                            --mach_strlen({MOV_REG_RM+1, glue_triads(3,EDI,ECX)}), -- mov edi, ecx
-                            next+i+4+disp} --& CALL_NEAR
+                            mach_strlen({MOV_REG_RM+1, glue_triads(3,EDI,ECX)}), -- mov edi, ecx
+                            next+i+4+disp} & CALL_NEAR
                     end if
                 else
                     fpoke4(fn, next+1, len)

@@ -229,6 +229,7 @@ if debug then
 end if
 
 map funcs = map:new()
+map fixes = map:new()
 
 constant OFF = 1, STR = 2
 for i = 1 to length(strings) do
@@ -307,7 +308,7 @@ for i = 1 to length(strings) do
                     map:put(x, fix[2], off_to_rva_ex(fix[1], sections[code]), APPEND)
                     map:put(funcs,fix[3],x)
                 else
-                    fix_it(fix[1],fix)
+                    map:put(fixes, fix[1], fix)
                 end if
             end if
             fix = -1 -- считаем, что длина строки исправлена (даже если наткнулись на short jmp)
@@ -455,6 +456,8 @@ end function
 if make_call_hooks then
     for_each(funcs, routine_id("add_call_hook"))
 end if
+
+for_each(fixes, routine_id("fix_it"))
 
 -----------------------------------------------------------------------------
 -- Физическое добавление новой секции
