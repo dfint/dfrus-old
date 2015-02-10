@@ -308,7 +308,7 @@ for i = 1 to length(strings) do
                     map:put(x, fix[2], off_to_rva_ex(fix[1], sections[code]), APPEND)
                     map:put(funcs,fix[3],x)
                 else
-                    if map:has(fixes, fix[1]) and not equal(map:get(fixes, fix[1]), fix) then
+                    if map:has(fixes, fix[1]) and not match(fix, map:get(fixes, fix[1])) then
                         sequence oldfix = map:get(fixes, fix[1])
                         sequence oldcode = oldfix[2]
                         fix[2] = oldcode & fix[2]
