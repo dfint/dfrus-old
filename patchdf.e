@@ -183,11 +183,47 @@ function fix_len(atom fn, atom off, integer oldlen, integer len,
     elsif and_bits(pre[$], #F8) = MOV_REG_IMM + 8 then -- mov reg, offset str
         reg = and_bits(pre[$], #7)
         if reg = EAX then -- mov eax, offset str
-            if pre[$-2] = PUSH_IMM8 and pre[$-1] = oldlen then -- push short len before
-                fpoke(fn, off-2, len)
-                return 1
-            elsif pre[$-5] = PUSH_IMM32 and bytes_to_int(pre[$-4..$-1]) = oldlen then -- push dword len before
+            if bytes_to_int(pre[$-4..$-1]) = oldlen then
                 fpoke4(fn, off-5, len)
+                if pre[$-5] = MOV_REG_IMM + 8 + EDI then  -- mov edi,len before
+                    -- fpoke4(fn, off-5, len)
+                    if oldlen = 15 and length(aft)>0 then
+                        atom address = 0
+                        if debug then
+                            address = off_to_rva_ex(next,section) + image_base
+                        end if
+                        
+                        integer mov_esp = 0
+                        integer i = 1
+                        while i<=length(aft) do
+                            object x = disasm(address,aft,i)
+                            if atom(x) then
+                                exit
+                            end if
+                            if aft[i]=MOV_RM_REG+1 and and_bits(aft[i+1],#3F)=glue_triads(0,EDI,4) and
+                                    aft[i+2]=glue_triads(0,ESP,4) then
+                                mov_esp = 1
+                            elsif aft[i]=CALL_NEAR then
+                                if mov_esp then
+                                    atom disp = check_sign_bit(bytes_to_int(aft[i+1..i+4]),32)
+                                    return {next+i-1,
+                                        (MOV_RM_IMM + 1) & glue_triads(1,0,ESI) & #14 & int_to_bytes(15), -- mov [esi+14h], 15
+                                        next+i+4+disp} & aft[i]
+                                else
+                                    exit
+                                end if
+                            end if
+                            i = x[$]
+                        end while
+                    end if
+                    return 1
+                -- elsif pre[$-5] = PUSH_IMM32 then -- push dword len before
+                    -- fpoke4(fn, off-5, len)
+                    -- return 1
+                end if
+                return 1
+            elsif pre[$-2] = PUSH_IMM8 and pre[$-1] = oldlen then -- push short len before
+                fpoke(fn, off-2, len)
                 return 1
             elsif length(aft)>0 and aft[1] = PUSH_IMM8 and aft[2] = oldlen then -- push len after
                 if jmp = JMP_NEAR then
@@ -207,39 +243,6 @@ function fix_len(atom fn, atom off, integer oldlen, integer len,
                     return 1
                 end if
                 return -1
-            elsif pre[$-5] = MOV_REG_IMM + 8 + EDI and
-                    bytes_to_int(pre[$-4..$-1]) = oldlen then -- mov edi,len ; до
-                fpoke4(fn, off-5, len)
-                if oldlen = 15 and length(aft)>0 then
-                    atom address = 0
-                    if debug then
-                        address = off_to_rva_ex(next,section) + image_base
-                    end if
-                    
-                    integer mov_esp = 0
-                    integer i = 1
-                    while i<=length(aft) do
-                        object x = disasm(address,aft,i)
-                        if atom(x) then
-                            exit
-                        end if
-                        if aft[i]=MOV_RM_REG+1 and and_bits(aft[i+1],#3F)=glue_triads(0,EDI,4) and
-                                aft[i+2]=glue_triads(0,ESP,4) then
-                            mov_esp = 1
-                        elsif aft[i]=CALL_NEAR then
-                            if mov_esp then
-                                atom disp = check_sign_bit(bytes_to_int(aft[i+1..i+4]),32)
-                                return {next+i-1,
-                                    (MOV_RM_IMM + 1) & glue_triads(1,0,ESI) & #14 & int_to_bytes(15), -- mov [esi+14h], 15
-                                    next+i+4+disp} & aft[i]
-                            else
-                                exit
-                            end if
-                        end if
-                        i = x[$]
-                    end while
-                end if
-                return 1
             elsif pre[$-1]=MOV_REG_RM+1 and and_bits(pre[$],#F8)=glue_triads(3,EDI,0) then
                 -- mov edi,reg; mov eax, offset str
                 -- ни разу не срабатывает
