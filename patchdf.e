@@ -183,10 +183,13 @@ function fix_len(atom fn, atom off, integer oldlen, integer len,
     elsif and_bits(pre[$], #F8) = MOV_REG_IMM + 8 then -- mov reg, offset str
         reg = and_bits(pre[$], #7)
         if reg = EAX then -- mov eax, offset str
-            if pre[$-2] = PUSH_IMM8 and pre[$-1] = oldlen then -- push len
-                fpoke(fn,off-2,len)
+            if pre[$-2] = PUSH_IMM8 and pre[$-1] = oldlen then -- push short len before
+                fpoke(fn, off-2, len)
                 return 1
-            elsif length(aft)>0 and aft[1] = PUSH_IMM8 and aft[2] = oldlen then -- push len
+            elsif pre[$-5] = PUSH_IMM32 and bytes_to_int(pre[$-4..$-1]) = oldlen then -- push dword len before
+                fpoke4(fn, off-5, len)
+                return 1
+            elsif length(aft)>0 and aft[1] = PUSH_IMM8 and aft[2] = oldlen then -- push len after
                 if jmp = JMP_NEAR then
                     return {oldnext+1 -1, -- jmp operand address
                         {PUSH_IMM8, len},
