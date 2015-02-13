@@ -20,7 +20,7 @@ include disasm.e
 
 with define DEBUG
 global integer debug = 0
-constant make_call_hooks = 0
+constant make_call_hooks = 1
 
 include patchdf.e
 include extract_strings.e
@@ -296,24 +296,33 @@ for i = 1 to length(strings) do
             else
                 -- Функция fix_len вернула смещение команды перехода, машинный код и смещение выхода
                 -- {src, mach, dest, op} = fix
+                atom src_off = fix[1]
+                sequence newcode = fix[2]
                 if fix[4]=CALL_NEAR and make_call_hooks then
                     -- Создаем таблицу функций (конструкторов строк)
                     -- В будущем в этой таблице можно хранить информацию о способе передачи аргументов
+                    atom dest_off = fix[3]
                     map x
-                    if not map:has(funcs, fix[3]) then
+                    if not map:has(funcs, dest_off) then
                         x = map:new()
                     else
-                        x = map:get(funcs,fix[3])
+                        x = map:get(funcs, dest_off)
                     end if
-                    map:put(x, fix[2], off_to_rva_ex(fix[1], sections[code]), APPEND)
-                    map:put(funcs,fix[3],x)
+                    
+                    -- Записываем новый код со ссылками и собираем ссылки на источник
+                    map:put(x, newcode, off_to_rva_ex(src_off, sections[code]), APPEND)
+                    -- Привязываем исправления кода к адресам функций
+                    map:put(funcs,dest_off,x)
                 else
-                    if map:has(fixes, fix[1]) and not match(fix, map:get(fixes, fix[1])) then
-                        sequence oldfix = map:get(fixes, fix[1])
+                    if map:has(fixes, src_off) then
+                        sequence oldfix = map:get(fixes, src_off)
                         sequence oldcode = oldfix[2]
-                        fix[2] = oldcode & fix[2]
+                        if not match(newcode, oldcode) then
+                            newcode = oldcode & newcode
+                        end if
+                        fix[2] = newcode
                     end if
-                    map:put(fixes, fix[1], fix)
+                    map:put(fixes, src_off, fix)
                 end if
             end if
             fix = -1 -- считаем, что длина строки исправлена (даже если наткнулись на short jmp)
@@ -392,7 +401,7 @@ end for
 
 -- Отложенное исправление
 function fix_it(object key, object fix, object user_data = 0, integer progress_code = 0)
-    atom src = fix[1]
+    atom src_off = fix[1]
     sequence mach = fix[2]
     atom dest = fix[3]
     
@@ -401,18 +410,18 @@ function fix_it(object key, object fix, object user_data = 0, integer progress_c
         stitch_rva = off_to_rva_ex(stitch_off, new_section),
         dest_rva = off_to_rva_ex(dest, sections[code]),
         disp = dest_rva-(stitch_rva+length(mach)+5), -- смещение перехода из петли
-        src_rva = off_to_rva_ex(src, sections[code])
+        src_rva = off_to_rva_ex(src_off, sections[code])
         
     mach &= JMP_NEAR & int_to_bytes(disp) -- добавляем выход из петли в нужное место
     -- Прописываем код петли в новую секцию:
     new_sect_off = add_to_new_section(fn, stitch_off, mach)
     disp = stitch_rva-(src_rva+5)
-    fpoke4(fn, src+1, disp) -- делаем переход на петлю
+    fpoke4(fn, src_off+1, disp) -- делаем переход на петлю
     return 0
 end function
 
 function add_call_hook(object key, object val, object user_data, integer progress_code)
-    sequence mach = flatten(map:keys(val))
+    sequence mach = flatten(map:keys(val)) -- Объединяем собранные куски кода
     atom dest = key
     atom
         stitch_off = new_sect_off,
@@ -432,28 +441,33 @@ function add_call_hook(object key, object val, object user_data, integer progres
         puts(1,"\n")
     end if
     
-    sequence code = fpeek(fn, {key, #10})
+    -- Сохраняем начало функции
+    sequence funccode = fpeek(fn, {key, #10})
     integer i = 1
-    while i<5+1 do -- 5 байт на jmp near + 1 байт т.к. i должен указывать как минимум на 6й байт
-        object x = disasm(0,code,i)
+    while i<=5 do -- 5 байт на jmp near
+        object x = disasm(0,funccode,i)
         i = x[$]
     end while
     
-    sequence saved_code = code[1..i-1]
+    sequence saved_code = funccode[1..i-1]
     
+    -- Добавляем сохранённую часть функции в конец нового кода
     mach &= saved_code
     
+    -- Рассчитываем смещение перехода
     atom disp = dest_rva+length(saved_code)-(stitch_rva+length(mach)+5)
     
+    -- Добавляем переход на продолжение функции
     mach &= JMP_NEAR & int_to_bytes(disp)
     
     new_sect_off = add_to_new_section(fn, stitch_off, mach)
     
-    atom src = key
-    atom src_rva = off_to_rva_ex(src, sections[code])
+    -- Добавляем в начало функции переход на новый код
+    atom src_off = key
+    atom src_rva = off_to_rva_ex(src_off, sections[code])
     disp = stitch_rva-(src_rva+5)
-    fpoke(fn, src, JMP_NEAR)
-    fpoke4(fn, src+1, disp)
+    fpoke(fn, src_off, JMP_NEAR)
+    fpoke4(fn, src_off+1, disp)
     
     return 0
 end function
