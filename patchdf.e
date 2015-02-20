@@ -103,6 +103,7 @@ end function
 
 include disasm.e
 
+constant MAX_LEN = 80 -- Ограничение для аварийного выхода из strlen()
 function mach_strlen(sequence ins)
     return {
         PUSH_REG + ECX, -- push ecx
@@ -110,14 +111,15 @@ function mach_strlen(sequence ins)
         -- @@:
         #80, #3c, #08, #00, -- cmp byte [eax+ecx], 0
         #74, #0B, -- jz success
-        #81,#F9,80,#00,#00,#00, -- cmp ecx, N
-        JCC_SHORT+COND_G,#03+length(ins), -- jg skip
+        #81, #F9, MAX_LEN, #00, #00, #00, -- cmp ecx, MAX_LEN
+        JCC_SHORT+COND_G, #03+length(ins), -- jg skip
         INC_REG + ECX, -- inc ecx
         JMP_SHORT, #EF -- jmp @b
         -- success:
-    } & ins -- some code
+    } &
+    ins & -- ; some code
     -- skip:
-    & POP_REG+ECX -- pop ecx
+    POP_REG+ECX -- pop ecx
 end function
 
 function find_instruction(sequence aft, integer instruct)
