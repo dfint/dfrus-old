@@ -20,7 +20,7 @@ include disasm.e
 
 with define DEBUG
 global integer debug = 0
-constant make_call_hooks = 1
+constant make_call_hooks = 0
 
 include patchdf.e
 include extract_strings.e
