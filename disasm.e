@@ -401,10 +401,10 @@ function disasm(integer start_addr, sequence s, integer i=1)
         sequence mnemos = {"add","or","adc","sbb","and","sub","xor","cmp"}
         if flags != 2 then
             object x = analyse_modrm(s,i+1)
-            sequence mnemonix = mnemos[x[1][2]+1]
             if atom(x) then
                 return x
             end if
+            sequence mnemonix = mnemos[x[1][2]+1]
             
             i = x[$]
             x = unify_operands(x)
