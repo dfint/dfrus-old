@@ -372,20 +372,19 @@ function disasm(integer start_addr, sequence s, integer i=1)
         atom immediate = addr+5+check_sign_bit(bytes_to_int(s[i+1..i+4]),32)
         text = sprintf("%s %s",{mnemonix, asmhex(immediate)})
         i += 5
-    elsif s[i] = JMP_SHORT then
+    elsif s[i] = JMP_SHORT or and_bits(s[i],#F0) = JCC_SHORT then
         if length(s)<i+1 then
             return length(s)-(i+1)
         end if
-        integer immediate = addr+2+check_sign_bit(s[i+1])
-        text = sprintf("jmp short %s",{asmhex(immediate)})
-        i += 2
-    elsif and_bits(s[i],#F0) = JCC_SHORT then
-        if length(s)<i+1 then
-            return length(s)-(i+1)
+        sequence mnemonic
+        if s[i] = JMP_SHORT then
+            mnemonic = "jmp"
+        else
+            integer condition = and_bits(s[i],#0F)
+            mnemonic = "j" & conds[condition+1]
         end if
-        integer condition = and_bits(s[i],#0F)
         integer immediate = addr+2+check_sign_bit(s[i+1])
-        text = sprintf("j%s short %s",{conds[condition+1], asmhex(immediate)})
+        text = sprintf("%s short %s",{mnemonic, asmhex(immediate)})
         i += 2
     elsif s[i] = LEA then
         object x = analyse_modrm(s,i+1)
