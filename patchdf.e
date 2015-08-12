@@ -21,6 +21,17 @@ procedure patch_unicode_table(atom fn, atom off)
     fpoke4(fn, off+'Ё'*4, #0401)
     fpoke4(fn, off+'ё'*4, #0451)
     fpoke4(fn, off+'А'*4, cyr)
+    
+    fpoke4(fn, off+#B2, #0406)  -- Capital ukrainian I
+    fpoke4(fn, off+#B3, #0456)  -- Lower case ukrainian I
+    
+    fpoke4(fn, off+#AF, #0407)  -- Capital ukrainian Yi (double dot i)
+    fpoke4(fn, off+#BF, #0457)  -- Lower case ukrainian Yi (double dot i)
+    
+    fpoke4(fn, off+#AA, #0406)  -- Capital ukrainian Ye
+    fpoke4(fn, off+#BA, #0454)  -- Lower case ukrainian Ye
+    
+    
 end procedure
 
 ifdef DEBUG then
@@ -179,7 +190,7 @@ function fix_len(atom fn, atom off, integer oldlen, integer len,
         -- По условным переходам и вызовам подпрогамм мы не ходим
         aft = {}
     end if
-
+    
     if pre[$] = PUSH_IMM32 then -- push offset str
         return -1 -- передача строки по ссылке, исправлять не нужно
     elsif and_bits(pre[$], #F8) = MOV_REG_IMM + 8 then -- mov reg, offset str
@@ -204,6 +215,7 @@ function fix_len(atom fn, atom off, integer oldlen, integer len,
                             end if
                             if aft[i]=MOV_RM_REG+1 and and_bits(aft[i+1],#3F)=glue_triads(0,EDI,4) and
                                     aft[i+2]=glue_triads(0,ESP,4) then
+                                -- mov [esp], edi
                                 mov_esp = 1
                             elsif aft[i]=CALL_NEAR then
                                 if mov_esp then
