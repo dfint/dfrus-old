@@ -190,6 +190,15 @@ function fix_len(atom fn, atom off, integer oldlen, integer len,
                 if pre[$-5] = MOV_REG_IMM + 8 + EDI then  -- mov edi,len before
                     -- fpoke4(fn, off-5, len)
                     if oldlen = 15 and length(aft)>0 then
+                        -- Sample code for this case:
+                        -- mov edi, 0fh
+                        -- mov eax, strz_You_last_spoke__db24d8
+                        -- lea esi, [esp+40h]
+                        -- mov [esp+54h], edi  ; Equivalent to mov [esi+14h], edi
+                        -- mov dword ptr [esp+50h], 0
+                        -- mov byte ptr [esp+40h], 0
+                        -- call sub_40f650
+                        
                         atom address = 0
                         if debug then
                             address = off_to_rva_ex(next,section) + image_base
@@ -202,7 +211,7 @@ function fix_len(atom fn, atom off, integer oldlen, integer len,
                             if atom(x) then
                                 exit
                             end if
-                            if aft[i]=MOV_RM_REG+1 and and_bits(aft[i+1],#3F)=glue_triads(0,EDI,4) and
+                            if aft[i]=MOV_RM_REG+1 and and_bits(aft[i+1],#3F)=glue_triads(0,EDI,4) and  -- mov [esp+N], edi
                                     aft[i+2]=glue_triads(0,ESP,4) then
                                 mov_esp = 1
                             elsif aft[i]=CALL_NEAR then
