@@ -174,9 +174,10 @@ function fix_len(atom fn, atom off, integer oldlen, integer len,
         jmp = aft[1] -- Отмечаем, что байты получены после перехода по jmp
         -- Переходим по jmp и считываем некоторе количество байт оттуда
         aft = fpeek(fn, {next,count_after})
-    elsif aft[1] = CALL_NEAR or and_bits(aft[1], #F0) = JCC_SHORT or
+    elsif aft[1] = CALL_NEAR then
+        aft = aft[1..5]  -- leave enough to work with near calls
+    elsif and_bits(aft[1], #F0) = JCC_SHORT or
                     (aft[1] = JCC_NEAR[1] and and_bits(aft[2], #F0) = JCC_NEAR[2]) then
-        -- По условным переходам и вызовам подпрогамм мы не ходим
         aft = {}
     end if
 
@@ -187,7 +188,7 @@ function fix_len(atom fn, atom off, integer oldlen, integer len,
         if reg = EAX then -- mov eax, offset str
             if bytes_to_int(pre[$-4..$-1]) = oldlen then
                 fpoke4(fn, off-5, len)
-                if pre[$-5] = MOV_REG_IMM + 8 + EDI then  -- mov edi,len before
+                if pre[$-5] = MOV_REG_IMM + 8 + EDI then  -- mov edi, len before
                     -- fpoke4(fn, off-5, len)
                     if oldlen = 15 and length(aft)>0 then
                         -- Sample code for this case:
@@ -228,9 +229,6 @@ function fix_len(atom fn, atom off, integer oldlen, integer len,
                         end while
                     end if
                     return 1
-                -- elsif pre[$-5] = PUSH_IMM32 then -- push dword len before
-                    -- fpoke4(fn, off-5, len)
-                    -- return 1
                 end if
                 return 1
             elsif pre[$-2] = PUSH_IMM8 and pre[$-1] = oldlen then -- push short len before
@@ -238,14 +236,14 @@ function fix_len(atom fn, atom off, integer oldlen, integer len,
                 return 1
             elsif length(aft)>0 and aft[1] = PUSH_IMM8 and aft[2] = oldlen then -- push len after
                 if jmp = JMP_NEAR then
-                    return {oldnext+1 -1, -- jmp operand address
+                    return {oldnext,
                         {PUSH_IMM8, len},
                         next+2, jmp} -- instuction after mov edi, len
                 elsif jmp = JMP_SHORT then
                     integer i = find_instruction(aft,CALL_NEAR)
                     if i>0 then
                         atom disp = check_sign_bit(bytes_to_int(aft[i+1..i+4]),32)
-                        return {next+i-1,
+                        return {next+(i-1),
                             mach_strlen({MOV_RM_REG+1, glue_triads(1,ECX,4), glue_triads(0,4,ESP), 8}), -- mov [ESP+8], ECX
                             next+i+4+disp} & aft[i]
                     end if
@@ -260,21 +258,21 @@ function fix_len(atom fn, atom off, integer oldlen, integer len,
                 integer i = find_instruction(aft, CALL_NEAR)
                 if i>0 then
                     atom disp = check_sign_bit(bytes_to_int(aft[i+1..i+4]),32)
-                    return {next+i-1,
+                    return {next+(i-1),
                         mach_strlen({MOV_REG_RM+1, glue_triads(3,EDI,ECX)}), -- mov edi, ecx
                         next+i+4+disp} & CALL_NEAR
                 end if
             elsif length(aft)>0 and aft[1] = MOV_REG_IMM + 8 + EDI and
                     bytes_to_int(aft[2..5]) = oldlen then -- mov edi,len ; после
                 if jmp = JMP_NEAR then
-                    return {oldnext+1-1, -- jmp operand address
+                    return {oldnext,
                         MOV_REG_IMM + 8 + EDI & int_to_bytes(len),
                         next+5, jmp} -- instuction after mov edi, len
                 elsif jmp = JMP_SHORT then
                     integer i = find_instruction(aft, CALL_NEAR)
                     if i>0 then
                         atom disp = check_sign_bit(bytes_to_int(aft[i+1..i+4]),32)
-                        return {next+i-1,
+                        return {next+(i-1),
                             mach_strlen({MOV_REG_RM+1, glue_triads(3,EDI,ECX)}), -- mov edi, ecx
                             next+i+4+disp} & CALL_NEAR
                     end if
